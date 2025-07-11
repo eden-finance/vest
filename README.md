@@ -7,7 +7,7 @@
 
 ## Overview
 
-The Nigerian Money Market Protocol is a decentralized finance (DeFi) platform that enables time-locked investments in Nigerian money markets using cNGN stablecoin. Built by **Eden Finance** and deployed on the **AssetChain blockchain**, this protocol provides investors with secure, transparent, and profitable investment opportunities while maintaining regulatory compliance.
+The Nigerian Money Market Protocol is a decentralized finance (DeFi) platform that enables time-locked investments in Nigerian money markets using cNGN stablecoin. This protocol provides investors with secure, transparent, and profitable investment opportunities while maintaining regulatory compliance.
 
 ## Features
 
@@ -296,21 +296,14 @@ This software is provided "as is" and any express or implied warranties are disc
 
 For technical support or questions:
 
-- **Email**: support@edenfinance.com
-- **Telegram**: [@EdenFinanceSupport](https://t.me/EdenFinanceSupport)
-- **Discord**: [Eden Finance Community](https://discord.gg/edenfinance)
+- **Email**: hello@edenfinance.org
+- **Telegram**: [@eden_finance](https://t.me/@eden_finance)
+
 
 ## About Eden Finance
 
-Eden Finance is a leading DeFi protocol focused on bringing traditional finance opportunities to the blockchain. We specialize in creating secure, transparent, and profitable investment products for the African financial markets.
+Eden Finance is a leading DeFi protocol focused on bringing traditional finance opportunities to the blockchain. We specialize in creating secure, transparent, and profitable investment products for the African financial markets and the world at large.
 
-- **Website**: [https://edenfinance.com](https://edenfinance.com)
-- **Twitter**: [@EdenFinance](https://twitter.com/EdenFinance)
-- **LinkedIn**: [Eden Finance](https://linkedin.com/company/eden-finance)
+- **Website**: [https://edenfinance.org](https://edenfinance.org)
+- **Twitter**: [@EdenFinance](https://twitter.com/0xedenfi)
 
----
-
-<div align="center">
-  <p>Built with ❤️ by Eden Finance Team</p>
-  <p>Deployed on AssetChain Blockchain</p>
-</div># nigerian-money-market
