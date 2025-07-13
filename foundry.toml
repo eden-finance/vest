@@ -2,9 +2,22 @@
 src = "src"
 out = "out"
 libs = ["lib"]
+gas_limit = 15000000 
+gas_price = 8000000000
+solc_version = "0.8.20"
+evm_version = "paris"
 remappings = [
     "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
     "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/"
 ]
 
+
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+
+[rpc_endpoints]
+assetchain_testnet = "https://enugu-rpc.assetchain.org"
+assetchain_mainnet = "https://rpc.assetchain.org"
+
+[etherscan]
+assetchain_testnet = { key = "${ETHERSCAN_API_KEY}", url = "https://scan-testnet.assetchain.org/api" }
+assetchain_mainnet = { key = "${ETHERSCAN_API_KEY}", url = "https://scan.assetchain.org/api" }

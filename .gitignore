@@ -5,7 +5,7 @@ lib/
 
 # Ignores development broadcast logs
 !/broadcast
-/broadcast/*/31337/
+/broadcast/*/42421/
 /broadcast/**/dry-run/
 
 # Docs
@@ -13,3 +13,4 @@ docs/
 
 # Dotenv file
 .env
+*.log

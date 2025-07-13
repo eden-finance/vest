@@ -84,10 +84,7 @@ ETHERSCAN_API_KEY=your_api_key_here
 
 ```bash
 # Deploy to AssetChain Mainnet
-forge script script/DeployNigerianMoneyMarket.s.sol:DeployNigerianMoneyMarket \
-  --rpc-url $ASSETCHAIN_RPC \
-  --broadcast \
-  --verify
+   forge script --chain 42421 script/NigerianMoneyMarket.s.sol:DeployTestnet --rpc-url $TESTNET_RPC --broadcast --private-key $PRIVATE_KEY
 ```
 
 ### Testnet Deployment
