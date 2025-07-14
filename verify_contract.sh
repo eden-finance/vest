@@ -3,7 +3,7 @@
 # Configuration
 CHAIN_ID=42421
 RPC_URL=$TESTNET_RPC
-SOLC_VERSION="v0.8.20"
+SOLC_VERSION="v0.8.22"
 VERIFIER_URL="https://scan-testnet.assetchain.org/api?"
 LOG_FILE="verify_contracts.log"
 
@@ -42,12 +42,12 @@ fi
 echo "Clearing cache and recompiling contracts with $SOLC_VERSION..."
 forge clean
 if ! forge build --force --compiler-version $SOLC_VERSION --root .; then
-    echo "Error: Compilation failed with $SOLC_VERSION. Trying v0.8.20+commit.a1b0870d..."
-    if ! forge build --force --compiler-version v0.8.20+commit.a1b0870d --root .; then
+    echo "Error: Compilation failed with $SOLC_VERSION. Trying v0.8.22+commit.87f61d96..."
+    if ! forge build --force --compiler-version 0.8.22+commit.87f61d96.Darwin.appleclang --root .; then
         echo "Error: Compilation failed. Check contract code or foundry.toml."
         exit 1
     fi
-    SOLC_VERSION="v0.8.20+commit.a1b0870d"
+    SOLC_VERSION="v0.8.22+commit.87f61d96"
 fi
 
 # Check for MockERC20 artifact
