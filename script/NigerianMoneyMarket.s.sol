@@ -4,6 +4,7 @@ pragma solidity ^0.8.22;
 import {Script, console} from "forge-std/Script.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {NigerianMoneyMarket} from "src/NigerianMoneyMarket.sol";
+import {NMMNFT} from "src/NMMNFT.sol";
 
 /**
  * @title Deploy Script for Nigerian Money Market
@@ -15,7 +16,7 @@ contract DeployNigerianMoneyMarket is Script {
         address admin = vm.envAddress("ADMIN_ADDRESS");
         address cNGNAddress = vm.envAddress("CNGN_ADDRESS");
         uint256 expectedRate = vm.envUint("EXPECTED_RATE"); // In basis points (e.g., 2000 = 20%)
-        
+
         // Multisig configuration
         string memory multisigAddressesStr = vm.envString("MULTISIG_ADDRESSES"); // Comma-separated addresses
         uint256 multisigThreshold = vm.envUint("MULTISIG_THRESHOLD"); // Number of required signatures
@@ -102,7 +103,7 @@ contract DeployNigerianMoneyMarket is Script {
         console.log("Contract Address:", address(market));
         console.log("cNGN Token:", address(market.cNGN()));
         console.log("Admin Role:", market.hasRole(market.ADMIN_ROLE(), admin));
-        
+
         console.log("Multisig Configuration:");
         console.log("- Signers:", signers.length);
         console.log("- Threshold:", threshold);
@@ -111,7 +112,13 @@ contract DeployNigerianMoneyMarket is Script {
         }
 
         // Get market configuration
-        (uint256 lockDuration, uint256 currentRate, uint256 totalDeposited, uint256 totalWithdrawn, bool acceptingDeposits) = market.marketConfig();
+        (
+            uint256 lockDuration,
+            uint256 currentRate,
+            uint256 totalDeposited,
+            uint256 totalWithdrawn,
+            bool acceptingDeposits
+        ) = market.marketConfig();
         console.log("Market Configuration:");
         console.log("- Lock Duration:", lockDuration, "seconds");
         console.log("- Expected Rate:", currentRate, "basis points");
@@ -133,33 +140,33 @@ contract DeployNigerianMoneyMarket is Script {
     function _parseAddresses(string memory addressesStr) internal pure returns (address[] memory) {
         bytes memory addressesBytes = bytes(addressesStr);
         uint256 count = 1;
-        
+
         // Count commas to determine array size
         for (uint256 i = 0; i < addressesBytes.length; i++) {
-            if (addressesBytes[i] == ',') {
+            if (addressesBytes[i] == ",") {
                 count++;
             }
         }
-        
+
         address[] memory addresses = new address[](count);
         uint256 index = 0;
         uint256 start = 0;
-        
+
         for (uint256 i = 0; i <= addressesBytes.length; i++) {
-            if (i == addressesBytes.length || addressesBytes[i] == ',') {
+            if (i == addressesBytes.length || addressesBytes[i] == ",") {
                 // Extract address substring
                 bytes memory addressBytes = new bytes(i - start);
                 for (uint256 j = 0; j < i - start; j++) {
                     addressBytes[j] = addressesBytes[start + j];
                 }
-                
+
                 // Convert to address (this is a simplified parser)
                 addresses[index] = _parseAddress(string(addressBytes));
                 index++;
                 start = i + 1;
             }
         }
-        
+
         return addresses;
     }
 
@@ -171,22 +178,22 @@ contract DeployNigerianMoneyMarket is Script {
     function _parseAddress(string memory addressStr) internal pure returns (address) {
         bytes memory addressBytes = bytes(addressStr);
         require(addressBytes.length == 42, "Invalid address length");
-        require(addressBytes[0] == '0' && addressBytes[1] == 'x', "Invalid address format");
-        
+        require(addressBytes[0] == "0" && addressBytes[1] == "x", "Invalid address format");
+
         uint256 result = 0;
         for (uint256 i = 2; i < 42; i++) {
             result *= 16;
-            if (addressBytes[i] >= '0' && addressBytes[i] <= '9') {
+            if (addressBytes[i] >= "0" && addressBytes[i] <= "9") {
                 result += uint8(addressBytes[i]) - 48;
-            } else if (addressBytes[i] >= 'a' && addressBytes[i] <= 'f') {
+            } else if (addressBytes[i] >= "a" && addressBytes[i] <= "f") {
                 result += uint8(addressBytes[i]) - 87;
-            } else if (addressBytes[i] >= 'A' && addressBytes[i] <= 'F') {
+            } else if (addressBytes[i] >= "A" && addressBytes[i] <= "F") {
                 result += uint8(addressBytes[i]) - 55;
             } else {
                 revert("Invalid address character");
             }
         }
-        
+
         return address(uint160(result));
     }
 }
@@ -204,6 +211,13 @@ contract DeployTestnet is Script {
         console.log("Deployer:", deployer);
 
         vm.startBroadcast(deployerPrivateKey);
+
+        // Deploy NMMNFT
+        NMMNFT nftRederer = new NMMNFT();
+        console.log("nftRederer deployed at:", address(nftRederer));
+        require(address(nftRederer) != address(0), "nftRederer deployment failed");
+
+        address nftRedererAddress = address(nftRederer);
 
         // Deploy mock cNGN token for testing
         MockERC20 cNGN = new MockERC20("cNGN Stablecoin", "cNGN", 18);
@@ -232,7 +246,8 @@ contract DeployTestnet is Script {
             deployer,
             2000, // 20% rate
             multisigSigners,
-            multisigThreshold
+            multisigThreshold,
+            nftRedererAddress
         );
 
         ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initData);
@@ -258,9 +273,9 @@ contract DeployTestnet is Script {
         console.log("Admin:", deployer);
         console.log("Multisig Signers:", signers.length);
         console.log("Multisig Threshold:", threshold);
-        
+
         // Display market configuration
-        (uint256 lockDuration, uint256 currentRate, , , bool acceptingDeposits) = market.marketConfig();
+        (uint256 lockDuration, uint256 currentRate,,, bool acceptingDeposits) = market.marketConfig();
         console.log("Lock Duration:", lockDuration, "seconds");
         console.log("Expected Rate:", currentRate, "basis points");
         console.log("Accepting Deposits:", acceptingDeposits);

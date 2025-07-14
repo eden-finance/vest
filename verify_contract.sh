@@ -23,6 +23,14 @@ if [ ! -f "src/NigerianMoneyMarket.sol" ]; then
     echo "Error: src/NigerianMoneyMarket.sol not found."
     exit 1
 fi
+if [ ! -f "src/NMMNFT.sol" ]; then
+    echo "Error: src/NMMNFT.sol not found."
+    exit 1
+fi
+if [ ! -f "src/lib/NMMNFTRenderer.sol" ]; then
+    echo "Error: src/lib/NMMNFTRenderer.sol not found."
+    exit 1
+fi
 if [ ! -f "lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol" ]; then
     echo "Error: OpenZeppelin ERC1967Proxy.sol not found. Run 'forge install openzeppelin/openzeppelin-contracts'."
     exit 1
@@ -63,6 +71,15 @@ fi
 echo "Checking for NigerianMoneyMarket artifact..."
 if [ ! -d "out/NigerianMoneyMarket.sol" ] || [ ! -f "out/NigerianMoneyMarket.sol/NigerianMoneyMarket.json" ]; then
     echo "Error: No artifact found for NigerianMoneyMarket in src/NigerianMoneyMarket.sol."
+    echo "Available artifacts:"
+    ls -R out
+    exit 1
+fi
+
+# Check for NMMNFTRenderer artifact
+echo "Checking for NMMNFTRenderer artifact..."
+if [ ! -d "out/NMMNFTRenderer.sol" ] || [ ! -f "out/NMMNFTRenderer.sol/NMMNFTRenderer.json" ]; then
+    echo "Error: No artifact found for NMMNFTRenderer in src/lib/NMMNFTRenderer.sol"
     echo "Available artifacts:"
     ls -R out
     exit 1
@@ -115,13 +132,25 @@ run_verify() {
     echo "Generated JSON for $contract_name successfully: $output_file"
 }
 
+# NMMNFT
+run_verify "NMMNFT" "nft_renderer.json" "forge verify-contract \
+  --chain $CHAIN_ID \
+  --compiler-version $SOLC_VERSION \
+  --num-of-optimizations 100000 \
+  0xb69e179d1e01cf4e09f8f2c3212d5af86b9816fd \
+  src/NMMNFT.sol:NMMNFT \
+  --verifier blockscout \
+  --verifier-url $VERIFIER_URL \
+  --show-standard-json-input \
+  --verbosity > nft_renderer.json"
+
 # MockERC20
 run_verify "MockERC20" "mock_cngn.json" "forge verify-contract \
   --chain $CHAIN_ID \
   --compiler-version $SOLC_VERSION \
   --num-of-optimizations 100000 \
   --constructor-args \"\$(cast abi-encode 'constructor(string,string,uint8)' 'cNGN Stablecoin' 'cNGN' 18)\" \
-  0x731b71c1b7c9d3fe12d765e1cd7cf7ed9a753dd4 \
+  0x96276cff6c1fe41636f6d45452044b7ce8be7a57 \
   script/NigerianMoneyMarket.s.sol:MockERC20 \
   --verifier blockscout \
   --verifier-url $VERIFIER_URL \
@@ -133,7 +162,7 @@ run_verify "NigerianMoneyMarket Implementation" "implementation.json" "forge ver
   --chain $CHAIN_ID \
   --compiler-version $SOLC_VERSION \
   --num-of-optimizations 100000 \
-  0x55133fb1a4911a8ac2e0c250f8e24067ccae977e \
+  0x5792f611b7b60fa010ca7ba3b2b96c4fc01cf825 \
   src/NigerianMoneyMarket.sol:NigerianMoneyMarket \
   --verifier blockscout \
   --verifier-url $VERIFIER_URL \
@@ -145,8 +174,8 @@ run_verify "ERC1967Proxy" "proxy.json" "forge verify-contract \
   --chain $CHAIN_ID \
   --compiler-version $SOLC_VERSION \
   --num-of-optimizations 100000 \
-  --constructor-args \"\$(cast abi-encode 'constructor(address,bytes)' 0x55133fb1a4911a8ac2e0c250f8e24067ccae977e 0x2a9d4dbc000000000000000000000000731b71c1b7c9d3fe12d765e1cd7cf7ed9a753dd400000000000000000000000054527b09aeb2be23f99958db8f2f827dab863a2800000000000000000000000000000000000000000000000000000000000007d000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000200000000000000000000000054527b09aeb2be23f99958db8f2f827dab863a280000000000000000000000001234567890123456789012345678901234567890)\" \
-  0x288cb965556fdc640bb61c114b2855a3a3a7af59 \
+  --constructor-args \"\$(cast abi-encode 'constructor(address,bytes)' 0x5792f611b7b60fa010ca7ba3b2b96c4fc01cf825 0x2313d7eb00000000000000000000000096276cff6c1fe41636f6d45452044b7ce8be7a5700000000000000000000000054527b09aeb2be23f99958db8f2f827dab863a2800000000000000000000000000000000000000000000000000000000000007d000000000000000000000000000000000000000000000000000000000000000c00000000000000000000000000000000000000000000000000000000000000002000000000000000000000000b69e179d1e01cf4e09f8f2c3212d5af86b9816fd000000000000000000000000000000000000000000000000000000000000000200000000000000000000000054527b09aeb2be23f99958db8f2f827dab863a280000000000000000000000001234567890123456789012345678901234567890)\" \
+  0xd4ae80608bcdb13ad2082ff8a432bba7e18eea60 \
   lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol:ERC1967Proxy \
   --verifier blockscout \
   --verifier-url $VERIFIER_URL \

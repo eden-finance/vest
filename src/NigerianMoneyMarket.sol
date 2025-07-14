@@ -14,6 +14,8 @@ import {ERC721Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC72
 import {Context} from "@openzeppelin/contracts/utils/Context.sol";
 import {ContextUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 
+import "./NMMNFT.sol";
+
 /**
  * @title Nigerian Money Market Investment Protocol
  * @dev A protocol for time-locked investments in Nigerian money markets using cNGN stablecoin
@@ -28,6 +30,9 @@ contract NigerianMoneyMarket is
     UUPSUpgradeable
 {
     using SafeERC20 for IERC20;
+    using NMMNFTRenderer for NMMNFTRenderer.RenderParams;
+
+    NMMNFT public nftRenderer;
 
     // ============ ROLES ============
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
@@ -99,7 +104,7 @@ contract NigerianMoneyMarket is
     mapping(uint256 => Investment) public investments;
     mapping(address => uint256[]) public userInvestments;
     mapping(address => uint256) public userTotalInvested;
-    
+
     // Multisig transaction management
     mapping(bytes32 => Transaction) public transactions;
     mapping(uint256 => bytes32) public pendingCollections; // tokenId => transactionHash
@@ -109,14 +114,16 @@ contract NigerianMoneyMarket is
     event InvestmentCreated(uint256 indexed tokenId, address indexed investor, uint256 amount, uint256 maturityTime);
     event InvestmentWithdrawn(uint256 indexed tokenId, address indexed investor, uint256 principal, uint256 returns_);
     event InvestmentMatured(uint256 indexed tokenId, uint256 actualReturn);
-    
+
     // Enhanced multisig events
-    event TransactionProposed(bytes32 indexed txHash, uint256 indexed tokenId, address indexed proposer, TransactionType txType);
+    event TransactionProposed(
+        bytes32 indexed txHash, uint256 indexed tokenId, address indexed proposer, TransactionType txType
+    );
     event TransactionSigned(bytes32 indexed txHash, address indexed signer, uint256 signatureCount);
     event TransactionExecuted(bytes32 indexed txHash, uint256 indexed tokenId, address indexed executor);
     event FundsCollected(uint256 indexed tokenId, address indexed collector, uint256 amount);
     event FundsReturned(uint256 indexed tokenId, address indexed returner, uint256 amount);
-    
+
     event MarketConfigUpdated(uint256 lockDuration, uint256 expectedRate, bool acceptingDeposits);
     event MultisigConfigUpdated(address[] signers, uint256 threshold);
 
@@ -154,11 +161,12 @@ contract NigerianMoneyMarket is
 
     // ============ INITIALIZATION ============
     function initialize(
-        address _cNGN, 
-        address _admin, 
+        address _cNGN,
+        address _admin,
         uint256 _expectedRate,
         address[] memory _multisigSigners,
-        uint256 _multisigThreshold
+        uint256 _multisigThreshold,
+        address _nftRenderer
     ) public initializer {
         __ERC721_init("Eden Finance Nigerian Money Market Position", "eCNGNP");
         __UUPSUpgradeable_init();
@@ -174,11 +182,39 @@ contract NigerianMoneyMarket is
             acceptingDeposits: true
         });
 
+        nftRenderer = NMMNFT(_nftRenderer);
         _setupMultisig(_multisigSigners, _multisigThreshold);
 
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
         _grantRole(ADMIN_ROLE, _admin);
         _grantRole(PAUSER_ROLE, _admin);
+    }
+
+    // ============ NFT RENDERING ============
+
+    /**
+     * @dev Override tokenURI to return beautiful procedurally generated NFTs
+     * @param tokenId The token ID to get URI for
+     * @return URI for the token metadata
+     */
+    function tokenURI(uint256 tokenId) public view override returns (string memory) {
+        _requireOwned(tokenId);
+        Investment memory investment = investments[tokenId];
+        NMMNFTRenderer.RenderParams memory params = NMMNFTRenderer.RenderParams({
+            tokenId: tokenId,
+            investor: investment.investor,
+            amount: investment.amount,
+            depositTime: investment.depositTime,
+            maturityTime: investment.maturityTime,
+            expectedReturn: investment.expectedReturn,
+            actualReturn: investment.actualReturn,
+            isMatured: investment.isMatured,
+            isWithdrawn: investment.isWithdrawn,
+            fundsCollected: investment.fundsCollected,
+            lockDuration: investment.lockDuration,
+            expectedRate: marketConfig.expectedRate
+        });
+        return nftRenderer.renderNFT(params);
     }
 
     // ============ INVESTMENT FUNCTIONS ============
@@ -259,12 +295,12 @@ contract NigerianMoneyMarket is
      */
     function proposeCollectFunds(uint256 tokenId) external onlyMultisigSigner validTokenId(tokenId) {
         Investment storage investment = investments[tokenId];
-        
+
         if (investment.fundsCollected) revert FundsAlreadyCollected();
         if (investment.isWithdrawn) revert InvestmentAlreadyWithdrawn();
 
         bytes32 txHash = _generateTransactionHash(tokenId, TransactionType.COLLECT_FUNDS);
-        
+
         if (transactions[txHash].proposer != address(0)) {
             // Transaction already exists, just sign it
             _signTransaction(txHash);
@@ -275,11 +311,11 @@ contract NigerianMoneyMarket is
             txn.proposer = msg.sender;
             txn.proposedAt = block.timestamp;
             txn.txType = TransactionType.COLLECT_FUNDS;
-            
+
             pendingCollections[tokenId] = txHash;
-            
+
             emit TransactionProposed(txHash, tokenId, msg.sender, TransactionType.COLLECT_FUNDS);
-            
+
             // Proposer automatically signs
             _signTransaction(txHash);
         }
@@ -291,12 +327,12 @@ contract NigerianMoneyMarket is
      */
     function proposeReturnFunds(uint256 tokenId) external onlyMultisigSigner validTokenId(tokenId) {
         Investment storage investment = investments[tokenId];
-        
+
         if (!investment.fundsCollected) revert FundsNotCollected();
         if (investment.isWithdrawn) revert InvestmentAlreadyWithdrawn();
 
         bytes32 txHash = _generateTransactionHash(tokenId, TransactionType.RETURN_FUNDS);
-        
+
         if (transactions[txHash].proposer != address(0)) {
             // Transaction already exists, just sign it
             _signTransaction(txHash);
@@ -307,11 +343,11 @@ contract NigerianMoneyMarket is
             txn.proposer = msg.sender;
             txn.proposedAt = block.timestamp;
             txn.txType = TransactionType.RETURN_FUNDS;
-            
+
             pendingReturns[tokenId] = txHash;
-            
+
             emit TransactionProposed(txHash, tokenId, msg.sender, TransactionType.RETURN_FUNDS);
-            
+
             // Proposer automatically signs
             _signTransaction(txHash);
         }
@@ -331,7 +367,7 @@ contract NigerianMoneyMarket is
      */
     function executeTransaction(bytes32 txHash) external onlyMultisigSigner {
         Transaction storage txn = transactions[txHash];
-        
+
         if (txn.proposer == address(0)) revert TransactionNotFound();
         if (txn.executed) revert TransactionAlreadyExecuted();
         if (txn.signatureCount < multisigConfig.threshold) revert InsufficientSignatures();
@@ -398,10 +434,7 @@ contract NigerianMoneyMarket is
      * @param _signers Array of new signers
      * @param _threshold New threshold
      */
-    function updateMultisigConfig(address[] memory _signers, uint256 _threshold)
-        external
-        onlyRole(ADMIN_ROLE)
-    {
+    function updateMultisigConfig(address[] memory _signers, uint256 _threshold) external onlyRole(ADMIN_ROLE) {
         _setupMultisig(_signers, _threshold);
         emit MultisigConfigUpdated(_signers, _threshold);
     }
@@ -468,25 +501,21 @@ contract NigerianMoneyMarket is
      * @return txType Type of transaction
      * @return signatureCount Number of signatures
      */
-    function getTransaction(bytes32 txHash) external view returns (
-        uint256 tokenId,
-        address proposer,
-        uint256 proposedAt,
-        uint256 executedAt,
-        bool executed,
-        TransactionType txType,
-        uint256 signatureCount
-    ) {
+    function getTransaction(bytes32 txHash)
+        external
+        view
+        returns (
+            uint256 tokenId,
+            address proposer,
+            uint256 proposedAt,
+            uint256 executedAt,
+            bool executed,
+            TransactionType txType,
+            uint256 signatureCount
+        )
+    {
         Transaction storage txn = transactions[txHash];
-        return (
-            txn.tokenId,
-            txn.proposer,
-            txn.proposedAt,
-            txn.executedAt,
-            txn.executed,
-            txn.txType,
-            txn.signatureCount
-        );
+        return (txn.tokenId, txn.proposer, txn.proposedAt, txn.executedAt, txn.executed, txn.txType, txn.signatureCount);
     }
 
     /**
@@ -557,7 +586,7 @@ contract NigerianMoneyMarket is
      */
     function _signTransaction(bytes32 txHash) internal {
         Transaction storage txn = transactions[txHash];
-        
+
         if (txn.proposer == address(0)) revert TransactionNotFound();
         if (txn.executed) revert TransactionAlreadyExecuted();
         if (txn.signatures[msg.sender]) revert AlreadySigned();
@@ -575,7 +604,7 @@ contract NigerianMoneyMarket is
      */
     function _executeCollectFunds(uint256 tokenId, address collector) internal {
         Investment storage investment = investments[tokenId];
-        
+
         if (investment.amount > cNGN.balanceOf(address(this))) revert InsufficientFunds();
 
         investment.fundsCollected = true;
@@ -583,7 +612,7 @@ contract NigerianMoneyMarket is
         investment.collectedAt = block.timestamp;
 
         cNGN.safeTransfer(collector, investment.amount);
-        
+
         // Clean up pending transaction
         delete pendingCollections[tokenId];
 
@@ -597,11 +626,11 @@ contract NigerianMoneyMarket is
      */
     function _executeReturnFunds(uint256 tokenId, address returner) internal {
         Investment storage investment = investments[tokenId];
-        
+
         uint256 returnAmount = investment.amount + investment.expectedReturn;
-        
+
         cNGN.safeTransferFrom(returner, address(this), returnAmount);
-        
+
         // Clean up pending transaction
         delete pendingReturns[tokenId];
 
