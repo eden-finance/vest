@@ -86,7 +86,7 @@ fi
 
 # Test cast abi-encode for ERC1967Proxy
 echo "Testing cast abi-encode for ERC1967Proxy..."
-if ! cast abi-encode "constructor(address,bytes)" 0x119E6d6177C576f59607Bef892c9800e0C78a6D2 0x1794bb3c000000000000000000000000d238916220f5d3bf435d305b5a3d262c13867a5200000000000000000000000054527b09aeb2be23f99958db8f2f827dab863a2800000000000000000000000000000000000000000000000000000000000007d0 > /dev/null; then
+if ! cast abi-encode "constructor(address,bytes)" 0x55133fb1a4911a8ac2e0c250f8e24067ccae977e 0x2a9d4dbc000000000000000000000000731b71c1b7c9d3fe12d765e1cd7cf7ed9a753dd400000000000000000000000054527b09aeb2be23f99958db8f2f827dab863a2800000000000000000000000000000000000000000000000000000000000007d000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000200000000000000000000000054527b09aeb2be23f99958db8f2f827dab863a280000000000000000000000001234567890123456789012345678901234567890 > /dev/null; then
     echo "Error: cast abi-encode failed for ERC1967Proxy. Check constructor signature or update Foundry."
     exit 1
 fi
@@ -119,8 +119,9 @@ run_verify() {
 run_verify "MockERC20" "mock_cngn.json" "forge verify-contract \
   --chain $CHAIN_ID \
   --compiler-version $SOLC_VERSION \
+  --num-of-optimizations 100000 \
   --constructor-args \"\$(cast abi-encode 'constructor(string,string,uint8)' 'cNGN Stablecoin' 'cNGN' 18)\" \
-  0xD238916220F5d3BF435d305b5a3d262c13867a52 \
+  0x731b71c1b7c9d3fe12d765e1cd7cf7ed9a753dd4 \
   script/NigerianMoneyMarket.s.sol:MockERC20 \
   --verifier blockscout \
   --verifier-url $VERIFIER_URL \
@@ -131,7 +132,8 @@ run_verify "MockERC20" "mock_cngn.json" "forge verify-contract \
 run_verify "NigerianMoneyMarket Implementation" "implementation.json" "forge verify-contract \
   --chain $CHAIN_ID \
   --compiler-version $SOLC_VERSION \
-  0x119E6d6177C576f59607Bef892c9800e0C78a6D2 \
+  --num-of-optimizations 100000 \
+  0x55133fb1a4911a8ac2e0c250f8e24067ccae977e \
   src/NigerianMoneyMarket.sol:NigerianMoneyMarket \
   --verifier blockscout \
   --verifier-url $VERIFIER_URL \
@@ -142,8 +144,9 @@ run_verify "NigerianMoneyMarket Implementation" "implementation.json" "forge ver
 run_verify "ERC1967Proxy" "proxy.json" "forge verify-contract \
   --chain $CHAIN_ID \
   --compiler-version $SOLC_VERSION \
-  --constructor-args \"\$(cast abi-encode 'constructor(address,bytes)' 0x119E6d6177C576f59607Bef892c9800e0C78a6D2 0x1794bb3c000000000000000000000000d238916220f5d3bf435d305b5a3d262c13867a5200000000000000000000000054527b09aeb2be23f99958db8f2f827dab863a2800000000000000000000000000000000000000000000000000000000000007d0)\" \
-  0x6A23fDabCF6fA132f18e567275568219C2a75239 \
+  --num-of-optimizations 100000 \
+  --constructor-args \"\$(cast abi-encode 'constructor(address,bytes)' 0x55133fb1a4911a8ac2e0c250f8e24067ccae977e 0x2a9d4dbc000000000000000000000000731b71c1b7c9d3fe12d765e1cd7cf7ed9a753dd400000000000000000000000054527b09aeb2be23f99958db8f2f827dab863a2800000000000000000000000000000000000000000000000000000000000007d000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000200000000000000000000000054527b09aeb2be23f99958db8f2f827dab863a280000000000000000000000001234567890123456789012345678901234567890)\" \
+  0x288cb965556fdc640bb61c114b2855a3a3a7af59 \
   lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol:ERC1967Proxy \
   --verifier blockscout \
   --verifier-url $VERIFIER_URL \

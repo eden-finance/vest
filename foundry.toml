@@ -5,11 +5,14 @@ libs = ["lib"]
 gas_limit = 15000000 
 gas_price = 8000000000
 solc_version = "0.8.22"
-evm_version = "paris"
+evm_version = "berlin"
 remappings = [
     "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
     "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/"
 ]
+optimizer = true
+optimizer_runs = 100000
+via_ir = true
 
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

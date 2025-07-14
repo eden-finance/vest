@@ -14,21 +14,41 @@ contract DeployNigerianMoneyMarket is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address admin = vm.envAddress("ADMIN_ADDRESS");
         address cNGNAddress = vm.envAddress("CNGN_ADDRESS");
-        address multisigAddress = vm.envAddress("MULTISIG_ADDRESS");
         uint256 expectedRate = vm.envUint("EXPECTED_RATE"); // In basis points (e.g., 2000 = 20%)
+        
+        // Multisig configuration
+        string memory multisigAddressesStr = vm.envString("MULTISIG_ADDRESSES"); // Comma-separated addresses
+        uint256 multisigThreshold = vm.envUint("MULTISIG_THRESHOLD"); // Number of required signatures
 
         console.log("Deploying Nigerian Money Market...");
         console.log("Deployer:", vm.addr(deployerPrivateKey));
         console.log("Admin:", admin);
         console.log("cNGN Token:", cNGNAddress);
-        console.log("Multisig:", multisigAddress);
         console.log("Expected Rate:", expectedRate, "basis points");
+        console.log("Multisig Threshold:", multisigThreshold);
+
+        // Parse multisig addresses
+        address[] memory multisigSigners = _parseAddresses(multisigAddressesStr);
+        console.log("Multisig Signers Count:", multisigSigners.length);
+        for (uint256 i = 0; i < multisigSigners.length; i++) {
+            console.log("Signer", i, ":", multisigSigners[i]);
+        }
 
         // VALIDATION: Check all addresses are valid
         require(admin != address(0), "Admin address cannot be zero");
         require(cNGNAddress != address(0), "cNGN address cannot be zero");
-        require(multisigAddress != address(0), "Multisig address cannot be zero");
-        require(expectedRate > 0 && expectedRate <= 10000, "Invalid rate"); // Max 100%
+        require(expectedRate > 0 && expectedRate <= 5000, "Invalid rate (max 50%)"); // Contract limit is 50%
+        require(multisigSigners.length >= 2 && multisigSigners.length <= 10, "Invalid multisig signers count");
+        require(multisigThreshold >= 2 && multisigThreshold <= multisigSigners.length, "Invalid multisig threshold");
+
+        // Validate multisig addresses
+        for (uint256 i = 0; i < multisigSigners.length; i++) {
+            require(multisigSigners[i] != address(0), "Multisig signer cannot be zero address");
+            // Check for duplicates
+            for (uint256 j = i + 1; j < multisigSigners.length; j++) {
+                require(multisigSigners[i] != multisigSigners[j], "Duplicate multisig signer");
+            }
+        }
 
         vm.startBroadcast(deployerPrivateKey);
 
@@ -39,9 +59,15 @@ contract DeployNigerianMoneyMarket is Script {
         // VALIDATION: Ensure implementation deployed successfully
         require(address(implementation) != address(0), "Implementation deployment failed");
 
-        // Prepare initialization data
-        bytes memory initData =
-            abi.encodeWithSelector(NigerianMoneyMarket.initialize.selector, cNGNAddress, admin, expectedRate);
+        // Prepare initialization data with all required parameters
+        bytes memory initData = abi.encodeWithSelector(
+            NigerianMoneyMarket.initialize.selector,
+            cNGNAddress,
+            admin,
+            expectedRate,
+            multisigSigners,
+            multisigThreshold
+        );
 
         // Deploy proxy with error handling
         ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initData);
@@ -59,9 +85,15 @@ contract DeployNigerianMoneyMarket is Script {
             revert("Failed to verify admin role - initialization may have failed");
         }
 
-        // Add multisig as authorized
-        market.updateMultisig(multisigAddress, true);
-        console.log("Multisig authorized:", multisigAddress);
+        // Verify multisig setup
+        (address[] memory signers, uint256 threshold) = market.getMultisigConfig();
+        require(signers.length == multisigSigners.length, "Multisig signers count mismatch");
+        require(threshold == multisigThreshold, "Multisig threshold mismatch");
+
+        // Verify each signer has MULTISIG_ROLE
+        for (uint256 i = 0; i < signers.length; i++) {
+            require(market.hasRole(market.MULTISIG_ROLE(), signers[i]), "Multisig role not properly assigned");
+        }
 
         vm.stopBroadcast();
 
@@ -70,14 +102,92 @@ contract DeployNigerianMoneyMarket is Script {
         console.log("Contract Address:", address(market));
         console.log("cNGN Token:", address(market.cNGN()));
         console.log("Admin Role:", market.hasRole(market.ADMIN_ROLE(), admin));
-        console.log("Multisig Role:", market.hasRole(market.MULTISIG_ROLE(), multisigAddress));
+        
+        console.log("Multisig Configuration:");
+        console.log("- Signers:", signers.length);
+        console.log("- Threshold:", threshold);
+        for (uint256 i = 0; i < signers.length; i++) {
+            console.log("- Signer", i, ":", signers[i]);
+        }
 
-        (uint256 lockDuration, uint256 rate,,, bool accepting) = market.marketConfig();
-        console.log("Lock Duration:", lockDuration, "seconds");
-        console.log("Expected Rate:", rate, "basis points");
-        console.log("Accepting Deposits:", accepting);
+        // Get market configuration
+        (uint256 lockDuration, uint256 currentRate, uint256 totalDeposited, uint256 totalWithdrawn, bool acceptingDeposits) = market.marketConfig();
+        console.log("Market Configuration:");
+        console.log("- Lock Duration:", lockDuration, "seconds");
+        console.log("- Expected Rate:", currentRate, "basis points");
+        console.log("- Accepting Deposits:", acceptingDeposits);
+
+        // Output statistics separately
+        console.log("Statistics:");
+        console.log("- Total Deposited:", totalDeposited);
+        console.log("- Total Withdrawn:", totalWithdrawn);
 
         console.log("\n=== Deployment Complete ===");
+    }
+
+    /**
+     * @dev Parse comma-separated addresses string into array
+     * @param addressesStr Comma-separated addresses
+     * @return addresses Array of parsed addresses
+     */
+    function _parseAddresses(string memory addressesStr) internal pure returns (address[] memory) {
+        bytes memory addressesBytes = bytes(addressesStr);
+        uint256 count = 1;
+        
+        // Count commas to determine array size
+        for (uint256 i = 0; i < addressesBytes.length; i++) {
+            if (addressesBytes[i] == ',') {
+                count++;
+            }
+        }
+        
+        address[] memory addresses = new address[](count);
+        uint256 index = 0;
+        uint256 start = 0;
+        
+        for (uint256 i = 0; i <= addressesBytes.length; i++) {
+            if (i == addressesBytes.length || addressesBytes[i] == ',') {
+                // Extract address substring
+                bytes memory addressBytes = new bytes(i - start);
+                for (uint256 j = 0; j < i - start; j++) {
+                    addressBytes[j] = addressesBytes[start + j];
+                }
+                
+                // Convert to address (this is a simplified parser)
+                addresses[index] = _parseAddress(string(addressBytes));
+                index++;
+                start = i + 1;
+            }
+        }
+        
+        return addresses;
+    }
+
+    /**
+     * @dev Parse a single address string
+     * @param addressStr Address string
+     * @return addr Parsed address
+     */
+    function _parseAddress(string memory addressStr) internal pure returns (address) {
+        bytes memory addressBytes = bytes(addressStr);
+        require(addressBytes.length == 42, "Invalid address length");
+        require(addressBytes[0] == '0' && addressBytes[1] == 'x', "Invalid address format");
+        
+        uint256 result = 0;
+        for (uint256 i = 2; i < 42; i++) {
+            result *= 16;
+            if (addressBytes[i] >= '0' && addressBytes[i] <= '9') {
+                result += uint8(addressBytes[i]) - 48;
+            } else if (addressBytes[i] >= 'a' && addressBytes[i] <= 'f') {
+                result += uint8(addressBytes[i]) - 87;
+            } else if (addressBytes[i] >= 'A' && addressBytes[i] <= 'F') {
+                result += uint8(addressBytes[i]) - 55;
+            } else {
+                revert("Invalid address character");
+            }
+        }
+        
+        return address(uint160(result));
     }
 }
 
@@ -109,12 +219,20 @@ contract DeployTestnet is Script {
         console.log("Implementation deployed at:", address(implementation));
         require(address(implementation) != address(0), "Implementation deployment failed");
 
-        // Deploy proxy
+        // Create multisig configuration for testnet (using deployer and a dummy address)
+        address[] memory multisigSigners = new address[](2);
+        multisigSigners[0] = deployer;
+        multisigSigners[1] = address(0x1234567890123456789012345678901234567890); // Dummy address for testing
+        uint256 multisigThreshold = 2;
+
+        // Deploy proxy with correct initialization parameters
         bytes memory initData = abi.encodeWithSelector(
             NigerianMoneyMarket.initialize.selector,
             address(cNGN),
             deployer,
-            2000 // 20% rate
+            2000, // 20% rate
+            multisigSigners,
+            multisigThreshold
         );
 
         ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initData);
@@ -126,17 +244,29 @@ contract DeployTestnet is Script {
         console.log("Market deployed at:", address(market));
         require(address(market) != address(0), "Market deployment failed");
 
-        // Setup multisig (using deployer for testing)
-        market.updateMultisig(deployer, true);
-        console.log("Deployer set as multisig for testing");
+        // Verify multisig setup
+        (address[] memory signers, uint256 threshold) = market.getMultisigConfig();
+        require(signers.length == 2, "Multisig signers not set correctly");
+        require(threshold == 2, "Multisig threshold not set correctly");
+        require(market.hasRole(market.MULTISIG_ROLE(), deployer), "Deployer should have multisig role");
 
         vm.stopBroadcast();
 
         console.log("\n=== Testnet Deployment Complete ===");
         console.log("cNGN Token:", address(cNGN));
         console.log("Market Contract:", address(market));
-        console.log("Admin/Multisig:", deployer);
-        console.logBytes(initData); // Debug initialization data
+        console.log("Admin:", deployer);
+        console.log("Multisig Signers:", signers.length);
+        console.log("Multisig Threshold:", threshold);
+        
+        // Display market configuration
+        (uint256 lockDuration, uint256 currentRate, , , bool acceptingDeposits) = market.marketConfig();
+        console.log("Lock Duration:", lockDuration, "seconds");
+        console.log("Expected Rate:", currentRate, "basis points");
+        console.log("Accepting Deposits:", acceptingDeposits);
+
+        // Output completion message
+        console.log("Deployment complete.");
     }
 }
 

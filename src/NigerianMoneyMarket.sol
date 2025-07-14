@@ -39,6 +39,8 @@ contract NigerianMoneyMarket is
     uint256 public constant MAX_INVESTMENT = 10_000_000e18; // 10M cNGN maximum
     uint256 public constant BASIS_POINTS = 10000;
     uint256 public constant DEFAULT_LOCK_DURATION = 30 days;
+    uint256 public constant MIN_MULTISIG_THRESHOLD = 2;
+    uint256 public constant MAX_MULTISIG_SIGNERS = 10;
 
     // ============ STRUCTS ============
     struct Investment {
@@ -50,7 +52,10 @@ contract NigerianMoneyMarket is
         uint256 actualReturn; // Actual return (set by multisig)
         bool isWithdrawn; // Whether the investment has been withdrawn
         bool isMatured; // Whether the investment has matured
+        bool fundsCollected; // Whether funds have been collected for investment
         address investor; // Address of the investor
+        address collectedBy; // Address of multisig who collected funds
+        uint256 collectedAt; // Timestamp when funds were collected
     }
 
     struct MarketConfig {
@@ -61,33 +66,59 @@ contract NigerianMoneyMarket is
         bool acceptingDeposits; // Whether new deposits are accepted
     }
 
+    struct MultisigConfig {
+        address[] signers; // Array of authorized signers
+        uint256 threshold; // Number of signatures required
+        mapping(address => bool) isSigner; // Quick lookup for signers
+        uint256 nonce; // Nonce for replay protection
+    }
+
+    struct Transaction {
+        uint256 tokenId; // Token ID for the transaction
+        address proposer; // Who proposed the transaction
+        uint256 proposedAt; // When it was proposed
+        uint256 executedAt; // When it was executed (0 if not executed)
+        bool executed; // Whether the transaction has been executed
+        TransactionType txType; // Type of transaction
+        mapping(address => bool) signatures; // Signatures from multisig members
+        uint256 signatureCount; // Number of signatures received
+    }
+
+    enum TransactionType {
+        COLLECT_FUNDS,
+        RETURN_FUNDS,
+        SET_ACTUAL_RETURNS
+    }
+
     // ============ STATE VARIABLES ============
     IERC20 public cNGN;
     uint256 public nextTokenId;
     MarketConfig public marketConfig;
+    MultisigConfig public multisigConfig;
 
     mapping(uint256 => Investment) public investments;
     mapping(address => uint256[]) public userInvestments;
     mapping(address => uint256) public userTotalInvested;
-
-    // Multisig treasury management
-    address[] public authorizedMultisigs;
-    mapping(address => bool) public isAuthorizedMultisig;
+    
+    // Multisig transaction management
+    mapping(bytes32 => Transaction) public transactions;
+    mapping(uint256 => bytes32) public pendingCollections; // tokenId => transactionHash
+    mapping(uint256 => bytes32) public pendingReturns; // tokenId => transactionHash
 
     // ============ EVENTS ============
     event InvestmentCreated(uint256 indexed tokenId, address indexed investor, uint256 amount, uint256 maturityTime);
-
     event InvestmentWithdrawn(uint256 indexed tokenId, address indexed investor, uint256 principal, uint256 returns_);
-
     event InvestmentMatured(uint256 indexed tokenId, uint256 actualReturn);
-
-    event FundsCollected(address indexed multisig, uint256 amount);
-
-    event FundsReturned(address indexed multisig, uint256 amount);
-
+    
+    // Enhanced multisig events
+    event TransactionProposed(bytes32 indexed txHash, uint256 indexed tokenId, address indexed proposer, TransactionType txType);
+    event TransactionSigned(bytes32 indexed txHash, address indexed signer, uint256 signatureCount);
+    event TransactionExecuted(bytes32 indexed txHash, uint256 indexed tokenId, address indexed executor);
+    event FundsCollected(uint256 indexed tokenId, address indexed collector, uint256 amount);
+    event FundsReturned(uint256 indexed tokenId, address indexed returner, uint256 amount);
+    
     event MarketConfigUpdated(uint256 lockDuration, uint256 expectedRate, bool acceptingDeposits);
-
-    event MultisigUpdated(address indexed multisig, bool authorized);
+    event MultisigConfigUpdated(address[] signers, uint256 threshold);
 
     // ============ ERRORS ============
     error InvalidAmount();
@@ -100,9 +131,35 @@ contract NigerianMoneyMarket is
     error InvalidRate();
     error InsufficientFunds();
     error TokenNotTransferable();
+    error FundsAlreadyCollected();
+    error FundsNotCollected();
+    error InvalidMultisigConfig();
+    error TransactionAlreadyExecuted();
+    error TransactionNotFound();
+    error AlreadySigned();
+    error InsufficientSignatures();
+    error InvalidTokenId();
+    error InvalidTransactionType();
+
+    // ============ MODIFIERS ============
+    modifier onlyMultisigSigner() {
+        if (!multisigConfig.isSigner[msg.sender]) revert NotAuthorizedMultisig();
+        _;
+    }
+
+    modifier validTokenId(uint256 tokenId) {
+        if (tokenId == 0 || tokenId >= nextTokenId) revert InvalidTokenId();
+        _;
+    }
 
     // ============ INITIALIZATION ============
-    function initialize(address _cNGN, address _admin, uint256 _expectedRate) public initializer {
+    function initialize(
+        address _cNGN, 
+        address _admin, 
+        uint256 _expectedRate,
+        address[] memory _multisigSigners,
+        uint256 _multisigThreshold
+    ) public initializer {
         __ERC721_init("Eden Finance Nigerian Money Market Position", "eCNGNP");
         __UUPSUpgradeable_init();
 
@@ -116,6 +173,8 @@ contract NigerianMoneyMarket is
             totalWithdrawn: 0,
             acceptingDeposits: true
         });
+
+        _setupMultisig(_multisigSigners, _multisigThreshold);
 
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
         _grantRole(ADMIN_ROLE, _admin);
@@ -146,7 +205,10 @@ contract NigerianMoneyMarket is
             actualReturn: 0,
             isWithdrawn: false,
             isMatured: false,
-            investor: msg.sender
+            fundsCollected: false,
+            investor: msg.sender,
+            collectedBy: address(0),
+            collectedAt: 0
         });
 
         userInvestments[msg.sender].push(tokenId);
@@ -165,7 +227,7 @@ contract NigerianMoneyMarket is
      * @dev Withdraw matured investment
      * @param tokenId The NFT token ID to withdraw
      */
-    function withdraw(uint256 tokenId) external nonReentrant {
+    function withdraw(uint256 tokenId) external nonReentrant validTokenId(tokenId) {
         Investment storage investment = investments[tokenId];
 
         if (ownerOf(tokenId) != msg.sender) revert NotTokenOwner();
@@ -192,27 +254,102 @@ contract NigerianMoneyMarket is
     // ============ MULTISIG FUNCTIONS ============
 
     /**
-     * @dev Collect funds for investment (multisig only)
-     * @param amount Amount to collect
+     * @dev Propose to collect funds for a specific investment
+     * @param tokenId Token ID of the investment
      */
-    function collectFunds(uint256 amount) external onlyRole(MULTISIG_ROLE) {
-        if (amount > cNGN.balanceOf(address(this))) revert InsufficientFunds();
+    function proposeCollectFunds(uint256 tokenId) external onlyMultisigSigner validTokenId(tokenId) {
+        Investment storage investment = investments[tokenId];
+        
+        if (investment.fundsCollected) revert FundsAlreadyCollected();
+        if (investment.isWithdrawn) revert InvestmentAlreadyWithdrawn();
 
-        cNGN.safeTransfer(msg.sender, amount);
-        emit FundsCollected(msg.sender, amount);
+        bytes32 txHash = _generateTransactionHash(tokenId, TransactionType.COLLECT_FUNDS);
+        
+        if (transactions[txHash].proposer != address(0)) {
+            // Transaction already exists, just sign it
+            _signTransaction(txHash);
+        } else {
+            // Create new transaction
+            Transaction storage txn = transactions[txHash];
+            txn.tokenId = tokenId;
+            txn.proposer = msg.sender;
+            txn.proposedAt = block.timestamp;
+            txn.txType = TransactionType.COLLECT_FUNDS;
+            
+            pendingCollections[tokenId] = txHash;
+            
+            emit TransactionProposed(txHash, tokenId, msg.sender, TransactionType.COLLECT_FUNDS);
+            
+            // Proposer automatically signs
+            _signTransaction(txHash);
+        }
     }
 
     /**
-     * @dev Return funds with returns (multisig only)
-     * @param amount Amount to return
+     * @dev Propose to return funds for a specific investment
+     * @param tokenId Token ID of the investment
      */
-    function returnFunds(uint256 amount) external onlyRole(MULTISIG_ROLE) {
-        cNGN.safeTransferFrom(msg.sender, address(this), amount);
-        emit FundsReturned(msg.sender, amount);
+    function proposeReturnFunds(uint256 tokenId) external onlyMultisigSigner validTokenId(tokenId) {
+        Investment storage investment = investments[tokenId];
+        
+        if (!investment.fundsCollected) revert FundsNotCollected();
+        if (investment.isWithdrawn) revert InvestmentAlreadyWithdrawn();
+
+        bytes32 txHash = _generateTransactionHash(tokenId, TransactionType.RETURN_FUNDS);
+        
+        if (transactions[txHash].proposer != address(0)) {
+            // Transaction already exists, just sign it
+            _signTransaction(txHash);
+        } else {
+            // Create new transaction
+            Transaction storage txn = transactions[txHash];
+            txn.tokenId = tokenId;
+            txn.proposer = msg.sender;
+            txn.proposedAt = block.timestamp;
+            txn.txType = TransactionType.RETURN_FUNDS;
+            
+            pendingReturns[tokenId] = txHash;
+            
+            emit TransactionProposed(txHash, tokenId, msg.sender, TransactionType.RETURN_FUNDS);
+            
+            // Proposer automatically signs
+            _signTransaction(txHash);
+        }
     }
 
     /**
-     * @dev Set actual returns for matured investments (multisig only)
+     * @dev Sign a pending transaction
+     * @param txHash Hash of the transaction to sign
+     */
+    function signTransaction(bytes32 txHash) external onlyMultisigSigner {
+        _signTransaction(txHash);
+    }
+
+    /**
+     * @dev Execute a fully signed transaction
+     * @param txHash Hash of the transaction to execute
+     */
+    function executeTransaction(bytes32 txHash) external onlyMultisigSigner {
+        Transaction storage txn = transactions[txHash];
+        
+        if (txn.proposer == address(0)) revert TransactionNotFound();
+        if (txn.executed) revert TransactionAlreadyExecuted();
+        if (txn.signatureCount < multisigConfig.threshold) revert InsufficientSignatures();
+
+        txn.executed = true;
+        txn.executedAt = block.timestamp;
+
+        if (txn.txType == TransactionType.COLLECT_FUNDS) {
+            _executeCollectFunds(txn.tokenId, msg.sender);
+        } else if (txn.txType == TransactionType.RETURN_FUNDS) {
+            _executeReturnFunds(txn.tokenId, msg.sender);
+        }
+
+        emit TransactionExecuted(txHash, txn.tokenId, msg.sender);
+    }
+
+    /**
+     * @dev Set actual returns for matured investments (requires multisig approval)
      * @param tokenIds Array of token IDs to mature
      * @param actualReturns Array of actual return amounts
      */
@@ -257,34 +394,16 @@ contract NigerianMoneyMarket is
     }
 
     /**
-     * @dev Add or remove authorized multisig
-     * @param multisig Address of the multisig
-     * @param authorized Whether to authorize or deauthorize
+     * @dev Update multisig configuration
+     * @param _signers Array of new signers
+     * @param _threshold New threshold
      */
-    function updateMultisig(address multisig, bool authorized) external onlyRole(ADMIN_ROLE) {
-        if (authorized) {
-            if (!isAuthorizedMultisig[multisig]) {
-                authorizedMultisigs.push(multisig);
-                isAuthorizedMultisig[multisig] = true;
-                _grantRole(MULTISIG_ROLE, multisig);
-            }
-        } else {
-            if (isAuthorizedMultisig[multisig]) {
-                isAuthorizedMultisig[multisig] = false;
-                _revokeRole(MULTISIG_ROLE, multisig);
-
-                // Remove from array
-                for (uint256 i = 0; i < authorizedMultisigs.length; i++) {
-                    if (authorizedMultisigs[i] == multisig) {
-                        authorizedMultisigs[i] = authorizedMultisigs[authorizedMultisigs.length - 1];
-                        authorizedMultisigs.pop();
-                        break;
-                    }
-                }
-            }
-        }
-
-        emit MultisigUpdated(multisig, authorized);
+    function updateMultisigConfig(address[] memory _signers, uint256 _threshold)
+        external
+        onlyRole(ADMIN_ROLE)
+    {
+        _setupMultisig(_signers, _threshold);
+        emit MultisigConfigUpdated(_signers, _threshold);
     }
 
     /**
@@ -330,11 +449,54 @@ contract NigerianMoneyMarket is
     }
 
     /**
-     * @dev Get authorized multisigs
-     * @return multisigs Array of authorized multisig addresses
+     * @dev Get multisig configuration
+     * @return signers Array of authorized signers
+     * @return threshold Number of signatures required
      */
-    function getAuthorizedMultisigs() external view returns (address[] memory) {
-        return authorizedMultisigs;
+    function getMultisigConfig() external view returns (address[] memory signers, uint256 threshold) {
+        return (multisigConfig.signers, multisigConfig.threshold);
+    }
+
+    /**
+     * @dev Get transaction details
+     * @param txHash Hash of the transaction
+     * @return tokenId Token ID
+     * @return proposer Address who proposed
+     * @return proposedAt When it was proposed
+     * @return executedAt When it was executed
+     * @return executed Whether it's executed
+     * @return txType Type of transaction
+     * @return signatureCount Number of signatures
+     */
+    function getTransaction(bytes32 txHash) external view returns (
+        uint256 tokenId,
+        address proposer,
+        uint256 proposedAt,
+        uint256 executedAt,
+        bool executed,
+        TransactionType txType,
+        uint256 signatureCount
+    ) {
+        Transaction storage txn = transactions[txHash];
+        return (
+            txn.tokenId,
+            txn.proposer,
+            txn.proposedAt,
+            txn.executedAt,
+            txn.executed,
+            txn.txType,
+            txn.signatureCount
+        );
+    }
+
+    /**
+     * @dev Check if address has signed a transaction
+     * @param txHash Hash of the transaction
+     * @param signer Address to check
+     * @return signed Whether the address has signed
+     */
+    function hasSignedTransaction(bytes32 txHash, address signer) external view returns (bool) {
+        return transactions[txHash].signatures[signer];
     }
 
     /**
@@ -347,30 +509,104 @@ contract NigerianMoneyMarket is
         return !investment.isWithdrawn && block.timestamp >= investment.maturityTime;
     }
 
-    // ============ CONTEXT OVERRIDES ============
-
-    /**
-     * @dev Override _msgSender to resolve conflict
-     */
-    function _msgSender() internal view override(Context, ContextUpgradeable) returns (address) {
-        return super._msgSender();
-    }
-
-    /**
-     * @dev Override _msgData to resolve conflict
-     */
-    function _msgData() internal view override(Context, ContextUpgradeable) returns (bytes calldata) {
-        return super._msgData();
-    }
-
-    /**
-     * @dev Override _contextSuffixLength to resolve conflict
-     */
-    function _contextSuffixLength() internal view override(Context, ContextUpgradeable) returns (uint256) {
-        return super._contextSuffixLength();
-    }
-
     // ============ INTERNAL FUNCTIONS ============
+
+    /**
+     * @dev Setup multisig configuration
+     * @param _signers Array of signers
+     * @param _threshold Required signatures
+     */
+    function _setupMultisig(address[] memory _signers, uint256 _threshold) internal {
+        if (_signers.length < MIN_MULTISIG_THRESHOLD || _signers.length > MAX_MULTISIG_SIGNERS) {
+            revert InvalidMultisigConfig();
+        }
+        if (_threshold < MIN_MULTISIG_THRESHOLD || _threshold > _signers.length) {
+            revert InvalidMultisigConfig();
+        }
+
+        // Clear existing signers
+        for (uint256 i = 0; i < multisigConfig.signers.length; i++) {
+            multisigConfig.isSigner[multisigConfig.signers[i]] = false;
+            _revokeRole(MULTISIG_ROLE, multisigConfig.signers[i]);
+        }
+
+        // Set new signers
+        multisigConfig.signers = _signers;
+        multisigConfig.threshold = _threshold;
+
+        for (uint256 i = 0; i < _signers.length; i++) {
+            if (_signers[i] == address(0)) revert InvalidMultisigConfig();
+            multisigConfig.isSigner[_signers[i]] = true;
+            _grantRole(MULTISIG_ROLE, _signers[i]);
+        }
+    }
+
+    /**
+     * @dev Generate transaction hash
+     * @param tokenId Token ID
+     * @param txType Transaction type
+     * @return txHash Generated hash
+     */
+    function _generateTransactionHash(uint256 tokenId, TransactionType txType) internal view returns (bytes32) {
+        return keccak256(abi.encodePacked(tokenId, txType, multisigConfig.nonce, block.chainid, address(this)));
+    }
+
+    /**
+     * @dev Sign a transaction
+     * @param txHash Hash of the transaction
+     */
+    function _signTransaction(bytes32 txHash) internal {
+        Transaction storage txn = transactions[txHash];
+        
+        if (txn.proposer == address(0)) revert TransactionNotFound();
+        if (txn.executed) revert TransactionAlreadyExecuted();
+        if (txn.signatures[msg.sender]) revert AlreadySigned();
+
+        txn.signatures[msg.sender] = true;
+        txn.signatureCount++;
+
+        emit TransactionSigned(txHash, msg.sender, txn.signatureCount);
+    }
+
+    /**
+     * @dev Execute collect funds transaction
+     * @param tokenId Token ID to collect funds for
+     * @param collector Address executing the collection
+     */
+    function _executeCollectFunds(uint256 tokenId, address collector) internal {
+        Investment storage investment = investments[tokenId];
+        
+        if (investment.amount > cNGN.balanceOf(address(this))) revert InsufficientFunds();
+
+        investment.fundsCollected = true;
+        investment.collectedBy = collector;
+        investment.collectedAt = block.timestamp;
+
+        cNGN.safeTransfer(collector, investment.amount);
+        
+        // Clean up pending transaction
+        delete pendingCollections[tokenId];
+
+        emit FundsCollected(tokenId, collector, investment.amount);
+    }
+
+    /**
+     * @dev Execute return funds transaction
+     * @param tokenId Token ID to return funds for
+     * @param returner Address executing the return
+     */
+    function _executeReturnFunds(uint256 tokenId, address returner) internal {
+        Investment storage investment = investments[tokenId];
+        
+        uint256 returnAmount = investment.amount + investment.expectedReturn;
+        
+        cNGN.safeTransferFrom(returner, address(this), returnAmount);
+        
+        // Clean up pending transaction
+        delete pendingReturns[tokenId];
+
+        emit FundsReturned(tokenId, returner, returnAmount);
+    }
 
     /**
      * @dev Calculate expected return for an investment
@@ -395,6 +631,29 @@ contract NigerianMoneyMarket is
         }
 
         return super._update(to, tokenId, auth);
+    }
+
+    // ============ CONTEXT OVERRIDES ============
+
+    /**
+     * @dev Override _msgSender to resolve conflict
+     */
+    function _msgSender() internal view override(Context, ContextUpgradeable) returns (address) {
+        return super._msgSender();
+    }
+
+    /**
+     * @dev Override _msgData to resolve conflict
+     */
+    function _msgData() internal view override(Context, ContextUpgradeable) returns (bytes calldata) {
+        return super._msgData();
+    }
+
+    /**
+     * @dev Override _contextSuffixLength to resolve conflict
+     */
+    function _contextSuffixLength() internal view override(Context, ContextUpgradeable) returns (uint256) {
+        return super._contextSuffixLength();
     }
 
     /**
