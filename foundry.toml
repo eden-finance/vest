@@ -8,7 +8,9 @@ solc_version = "0.8.22"
 evm_version = "berlin"
 remappings = [
     "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
-    "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/"
+    "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+    "@bokkypoobah/BokkyPooBahsDateTimeLibrary/=lib/BokkyPooBahsDateTimeLibrary/"
+
 ]
 optimizer = true
 optimizer_runs = 100000

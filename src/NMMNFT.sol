@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import "./lib/NMMNFTRenderer.sol";
+import "./libs/NMMNFTRenderer.sol";
 
 contract NMMNFT {
     function renderNFT(NMMNFTRenderer.RenderParams memory params) external view returns (string memory) {
