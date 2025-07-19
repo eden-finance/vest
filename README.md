@@ -1,4 +1,4 @@
-# Nigerian Money Market Protocol
+# Eden Vest
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 ![Solidity](https://img.shields.io/badge/Solidity-^0.8.20-purple.svg)
@@ -7,7 +7,7 @@
 
 ## Overview
 
-The Nigerian Money Market Protocol is a decentralized finance (DeFi) platform that enables time-locked investments in Nigerian money markets using cNGN stablecoin. This protocol provides investors with secure, transparent, and profitable investment opportunities while maintaining regulatory compliance.
+The edenVest is a decentralized finance (DeFi) platform that enables time-locked investments in Nigerian money markets using cNGN stablecoin. This protocol provides investors with secure, transparent, and profitable investment opportunities while maintaining regulatory compliance.
 
 ## Features
 
@@ -92,7 +92,7 @@ ETHERSCAN_API_KEY=your_api_key_here
 
 ```bash
 # Deploy to AssetChain Testnet (includes mock cNGN)
-   forge script --chain 42421 script/NigerianMoneyMarket.s.sol:DeployTestnet --rpc-url $TESTNET_RPC --broadcast --private-key $PRIVATE_KEY
+   forge script --chain 42421 script/EdenCore.s.sol:DeployEdenCoreScript --rpc-url $TESTNET_RPC --broadcast --private-key $PRIVATE_KEY
 ```
 
 ## Usage
@@ -265,7 +265,7 @@ event MultisigUpdated(address indexed multisig, bool authorized);
 
 ## Contributing
 
-We welcome contributions to the Nigerian Money Market Protocol! Please follow these guidelines:
+We welcome contributions to the edenVest! Please follow these guidelines:
 
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/amazing-feature`

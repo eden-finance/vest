@@ -10,7 +10,7 @@ import "@bokkypoobah/BokkyPooBahsDateTimeLibrary/contracts/BokkyPooBahsDateTimeL
  * @title Nigerian Money Market NFT Renderer with Advanced Animations
  * @dev Generates unique animated SVG-based NFTs for investment positions
  */
-library NMMNFTRenderer {
+library EdenPoolNFTRenderer {
     using Strings for uint256;
 
     struct RenderParams {

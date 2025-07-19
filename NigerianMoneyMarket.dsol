@@ -50,12 +50,14 @@ contract NigerianMoneyMarket is
     // ============ STRUCTS ============
     struct Investment {
         uint256 amount; // Amount of cNGN deposited
+        string title // investment title
         uint256 depositTime; // When the investment was made
         uint256 lockDuration; // Duration of the lock period
         uint256 maturityTime; // When the investment matures
         uint256 expectedReturn; // Expected return amount
         uint256 actualReturn; // Actual return (set by multisig)
         bool isWithdrawn; // Whether the investment has been withdrawn
+        uint256 withdrawnAt // When the investment was withdrawn and closed.
         bool isMatured; // Whether the investment has matured
         bool fundsCollected; // Whether funds have been collected for investment
         address investor; // Address of the investor
