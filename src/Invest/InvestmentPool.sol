@@ -132,9 +132,7 @@ contract InvestmentPool is
             depositTime: block.timestamp,
             maturityTime: maturityTime,
             expectedReturn: expectedReturn,
-            actualReturn: 0,
-            isWithdrawn: false,
-            isMatured: false
+            isWithdrawn: false
         });
 
         userInvestments[investor].push(investmentId);
@@ -184,15 +182,7 @@ contract InvestmentPool is
 
         investment.isWithdrawn = true;
 
-        // Calculate withdrawal amount
-        withdrawAmount = investment.amount;
-        if (investment.isMatured && investment.actualReturn > 0) {
-            withdrawAmount += investment.actualReturn;
-        } else {
-            withdrawAmount += investment.expectedReturn;
-        }
-
-        totalWithdrawn += withdrawAmount;
+        withdrawAmount += investment.expectedReturn;
 
         // Burn LP tokens
         ILPToken(lpToken).burn(address(this), requiredLPTokens);
@@ -200,39 +190,16 @@ contract InvestmentPool is
         // Burn NFT
         INFTPositionManager(nftManager).burnPosition(tokenId);
 
-        // Transfer funds from multisig to investor (via EdenCore)
-        IERC20(cNGN).safeTransferFrom(poolMultisig, edenCore, withdrawAmount);
+        // Check pool has sufficient balance
+        require(IERC20(cNGN).balanceOf(address(this)) >= withdrawAmount, "Insufficient pool balance");
+
+        // Transfer funds from pool to investor
+        IERC20(cNGN).safeTransfer(investment.investor, withdrawAmount);
 
         emit InvestmentWithdrawn(investmentId, investor, withdrawAmount);
     }
 
-    // ============ MULTISIG FUNCTIONS ============
-
-    /**
-     * @notice Set actual returns for matured investments
-     * @param investmentIds Array of investment IDs
-     * @param actualReturns Array of actual returns
-     */
-    function setActualReturns(uint256[] calldata investmentIds, uint256[] calldata actualReturns)
-        external
-        onlyRole(MULTISIG_ROLE)
-    {
-        require(investmentIds.length == actualReturns.length, "Length mismatch");
-
-        for (uint256 i = 0; i < investmentIds.length; i++) {
-            Investment storage investment = investments[investmentIds[i]];
-
-            if (block.timestamp >= investment.maturityTime && !investment.isMatured) {
-                investment.actualReturn = actualReturns[i];
-                investment.isMatured = true;
-
-                emit InvestmentMatured(investmentIds[i], actualReturns[i]);
-            }
-        }
-    }
-
     // ============ ADMIN FUNCTIONS ============
-
     /**
      * @notice Update pool configuration
      * @param config New configuration

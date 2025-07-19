@@ -37,9 +37,7 @@ interface IInvestmentPool {
         uint256 depositTime;
         uint256 maturityTime;
         uint256 expectedReturn;
-        uint256 actualReturn;
         bool isWithdrawn;
-        bool isMatured;
     }
 
     event InvestmentCreated(

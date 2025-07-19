@@ -87,7 +87,7 @@ contract PoolFactory is IPoolFactory, Ownable {
 
         // Initialize pool
         InvestmentPool(pool).initialize(initParams);
-        
+
         // Register pool
         isPool[pool] = true;
         allPools.push(pool);
