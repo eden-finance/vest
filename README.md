@@ -1,305 +1,422 @@
-# Eden Vest
+# Eden Vest Protocol
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-![Solidity](https://img.shields.io/badge/Solidity-^0.8.20-purple.svg)
+![Solidity](https://img.shields.io/badge/Solidity-^0.8.22-purple.svg)
 ![OpenZeppelin](https://img.shields.io/badge/OpenZeppelin-5.x-green.svg)
 ![AssetChain](https://img.shields.io/badge/AssetChain-Mainnet-orange.svg)
+[![Foundry](https://img.shields.io/badge/Built%20with-Foundry-FFDB1C.svg)](https://book.getfoundry.sh/)
 
-## Overview
+## 🌍 Overview
 
-The edenVest is a decentralized finance (DeFi) platform that enables time-locked investments in Nigerian money markets using cNGN stablecoin. This protocol provides investors with secure, transparent, and profitable investment opportunities while maintaining regulatory compliance.
+Eden Vest is a next-generation decentralized investment protocol that bridges traditional finance with DeFi, enabling organizations, governments, and corporations to create tokenized investment pools on-chain. Built on AssetChain, Eden Vest revolutionizes how real-world assets and investment opportunities are accessed globally.
 
-## Features
+### 🎯 Key Features
 
-- **Time-locked Investments**: Secure your capital with predetermined lock periods
-- **cNGN Stablecoin Integration**: Invest using Nigeria's premier stablecoin
-- **Non-transferable NFTs**: Receive unique position tokens that cannot be transferred
-- **Flexible Returns**: Support for both expected and actual returns managed by multisig
-- **Upgradeable Architecture**: UUPS proxy pattern for future enhancements
-- **Multi-role Access Control**: Admin, multisig, and pauser roles for security
-- **Emergency Pause**: Circuit breaker functionality for security
+- **🏊 Multi-Pool Architecture**: Create unlimited investment pools for different asset classes
+- **🪙 LP Token System**: Receive tradeable LP tokens representing your pool shares
+- **🎨 Dynamic NFT Positions**: Beautiful, animated NFTs visualizing your investments
+- **💱 Multi-Token Support**: Invest with any token via integrated DEX swaps
+- **🏛️ Institutional Grade**: Designed for governments, corporations, and financial institutions
+- **🔐 Multisig Security**: Pool-specific multisig wallets for fund management
+- **📊 Tax Management**: Automated tax collection and distribution system
+- **🔄 Upgradeable**: UUPS proxy pattern for seamless protocol evolution
 
-## How It Works
+## 🏗️ Architecture
 
-1. **Invest**: Users deposit cNGN tokens and receive non-transferable NFTs representing their position
-2. **Lock Period**: Investments are locked for a predetermined duration (default: 30 days)
-3. **Returns**: Multisig-managed actual returns are set based on real market performance
-4. **Withdraw**: After maturity, users can withdraw their principal plus returns
-
-## Smart Contract Architecture
-
+```mermaid
+graph TB
+    A[Eden Core] --> B[Pool Factory]
+    A --> C[Tax Collector]
+    A --> D[Swap Router]
+    A --> E[NFT Manager]
+    
+    B --> F[Investment Pool 1]
+    B --> G[Investment Pool 2]
+    B --> H[Investment Pool N]
+    
+    F --> I[LP Token 1]
+    G --> J[LP Token 2]
+    H --> K[LP Token N]
+    
+    E --> L[Position NFTs]
+    
+    style A fill:#9A74EB
+    style B fill:#21A88C
+    style C fill:#21A88C
+    style D fill:#21A88C
+    style E fill:#21A88C
 ```
-NigerianMoneyMarket (UUPS Proxy)
-├── ERC721Upgradeable (Position NFTs)
-├── AccessControl (Role-based permissions)
-├── ReentrancyGuard (Protection against reentrancy)
-├── Pausable (Emergency stop mechanism)
-└── UUPSUpgradeable (Upgrade functionality)
-```
 
-## Installation
+### Core Contracts
+
+| Contract | Description | Key Functions |
+|----------|-------------|---------------|
+| **EdenCore** | Main protocol entry point | `createPool()`, `invest()`, `withdraw()` |
+| **PoolFactory** | Deploys investment pools efficiently | `createPool()` |
+| **InvestmentPool** | Individual pool logic | `invest()`, `withdraw()`, `setActualReturns()` |
+| **LPToken** | ERC20 pool share tokens | `mint()`, `burn()` |
+| **TaxCollector** | Tax management system | `collectTax()`, `withdrawTax()` |
+| **SwapRouter** | DEX integration | `swapExactTokensForTokens()` |
+| **NFTPositionManager** | NFT position tracking | `mintPosition()`, `burnPosition()` |
+| **AdminInterface** | Protocol administration | `createPool()`, `updatePoolConfig()` |
+
+## 🚀 Getting Started
 
 ### Prerequisites
 
-- [Foundry](https://book.getfoundry.sh/getting-started/installation)
-- [Git](https://git-scm.com/)
-- [Node.js](https://nodejs.org/) (for additional tooling)
+- [Foundry](https://book.getfoundry.sh/getting-started/installation) - Smart contract development framework
+- [Git](https://git-scm.com/) - Version control
+- [Node.js](https://nodejs.org/) v18+ - For additional tooling
 
-### Clone the Repository
-
-```bash
-git clone https://github.com/eden-finance/nigerian-money-market.git
-cd nigerian-money-market
-```
-
-### Install Dependencies
+### Installation
 
 ```bash
+# Clone the repository
+git clone https://github.com/eden-finance/eden-vest.git
+cd eden-vest
+
+# Install dependencies
 forge install
+
+# Build contracts
+forge build
+
+# Run tests
+forge test
 ```
 
-### Set Up Environment Variables
+### Environment Setup
 
-Create a `.env` file in the root directory:
+Create a `.env` file:
 
 ```env
-# Deployment Configuration
-PRIVATE_KEY=your_private_key_here
-ADMIN_ADDRESS=0x...
-CNGN_ADDRESS=0x...
-MULTISIG_ADDRESS=0x...
-EXPECTED_RATE=1500  # 15% in basis points
-
-# RPC URLs
+# Network Configuration
 ASSETCHAIN_RPC=https://rpc.assetchain.org
 TESTNET_RPC=https://testnet-rpc.assetchain.org
+PRIVATE_KEY=your_deployment_key
+
+# Contract Configuration
+ADMIN_ADDRESS=0x...
+TREASURY_ADDRESS=0x...
+CNGN_ADDRESS=0x...
+GLOBAL_TAX_RATE=250  # 2.5% in basis points
+
+# First Pool Configuration
+POOL_NAME="Nigerian Money Market"
+POOL_SYMBOL="NMM"
+POOL_MULTISIG=0x...
+LOCK_DURATION=2592000  # 30 days in seconds
+MIN_INVESTMENT=1000000000000000000000  # 1000 cNGN
+MAX_INVESTMENT=10000000000000000000000000  # 10M cNGN
+EXPECTED_RATE=1500  # 15% APY
+
+# DEX Configuration (if available)
+UNISWAP_ROUTER=0x...
+UNISWAP_QUOTER=0x...
 
 # Verification
-ETHERSCAN_API_KEY=your_api_key_here
+ETHERSCAN_API_KEY=your_api_key
 ```
 
-## Deployment
-
-### Mainnet Deployment
-
-```bash
-# Deploy to AssetChain Mainnet
-   forge script --chain 42420 script/NigerianMoneyMarket.s.sol:contract DeployNigerianMoneyMarket is Script {
- --rpc-url $MAINNET_RPC --broadcast --private-key $PRIVATE_KEY
-```
-
-### Testnet Deployment
-
-```bash
-# Deploy to AssetChain Testnet (includes mock cNGN)
-   forge script --chain 42421 script/EdenCore.s.sol:DeployEdenCoreScript --rpc-url $TESTNET_RPC --broadcast --private-key $PRIVATE_KEY
-```
-
-## Usage
+## 📊 Usage Examples
 
 ### For Investors
 
-#### Making an Investment
+#### Direct Investment with cNGN
 
 ```solidity
 // Approve cNGN spending
-cNGN.approve(address(market), amount);
+IERC20(cNGN).approve(edenCore, investmentAmount);
 
-// Invest
-uint256 tokenId = market.invest(amount);
-```
-
-#### Withdrawing Returns
-
-```solidity
-// Check if withdrawable
-bool canWithdraw = market.isWithdrawable(tokenId);
-
-// Withdraw after maturity
-market.withdraw(tokenId);
-```
-
-### For Administrators
-
-#### Updating Market Configuration
-
-```solidity
-market.updateMarketConfig(
-    30 days,    // Lock duration
-    1500,       // Expected rate (15%)
-    true        // Accepting deposits
+// Invest in a specific pool
+(uint256 nftId, uint256 lpTokens) = edenCore.invest(
+    poolAddress,
+    investmentAmount,
+    "My Q1 2024 Investment"
 );
 ```
 
-#### Managing Multisigs
+#### Investment with Token Swap
 
 ```solidity
-// Add multisig
-market.updateMultisig(multisigAddress, true);
+// Approve any token
+IERC20(USDT).approve(edenCore, usdtAmount);
 
-// Remove multisig
-market.updateMultisig(multisigAddress, false);
+// Invest with automatic swap to cNGN
+EdenCore.InvestmentParams memory params = EdenCore.InvestmentParams({
+    pool: poolAddress,
+    tokenIn: USDT,
+    amountIn: usdtAmount,
+    minAmountOut: minCNGN,
+    deadline: block.timestamp + 300,
+    title: "USDT Investment"
+});
+
+(uint256 nftId, uint256 lpTokens) = edenCore.investWithSwap(params);
 ```
 
-### For Multisigs
-
-#### Collecting Funds
+#### Using LP Tokens as Collateral
 
 ```solidity
-// Collect funds for investment
-market.collectFunds(amount);
+// Approve LP tokens for Eden Lending Protocol
+IERC20(lpToken).approve(edenLending, lpAmount);
+
+// Borrow against LP tokens
+edenLending.borrow(lpToken, lpAmount, borrowAmount);
 ```
+
+#### Withdrawing Investment
+
+```solidity
+// Return LP tokens and withdraw
+IERC20(lpToken).approve(poolAddress, lpAmount);
+edenCore.withdraw(poolAddress, nftId, lpAmount);
+```
+
+### For Pool Administrators
+
+#### Creating a New Pool
+
+```solidity
+IPoolFactory.PoolParams memory params = IPoolFactory.PoolParams({
+    name: "Government Infrastructure Fund",
+    symbol: "GIF",
+    admin: adminAddress,
+    cNGN: cNGNAddress,
+    poolMultisig: multisigAddress,
+    multisigSigners: [signer1, signer2, signer3],
+    lockDuration: 90 days,
+    minInvestment: 5000e18,
+    maxInvestment: 50_000_000e18,
+    utilizationCap: 1_000_000_000e18,
+    expectedRate: 2000, // 20% APY
+    taxRate: 0 // Use global rate
+});
+
+address newPool = adminInterface.createPool(params);
+```
+
+#### Managing Pool Configuration
+
+```solidity
+IInvestmentPool.PoolConfig memory config = IInvestmentPool.PoolConfig({
+    name: "Updated Pool Name",
+    lockDuration: 60 days,
+    minInvestment: 2000e18,
+    maxInvestment: 100_000_000e18,
+    utilizationCap: 2_000_000_000e18,
+    expectedRate: 1800,
+    taxRate: 300, // 3% pool-specific tax
+    acceptingDeposits: true
+});
+
+adminInterface.updatePoolConfig(poolAddress, config);
+```
+
+### For Multisig Operations
 
 #### Setting Actual Returns
 
 ```solidity
-uint256[] memory tokenIds = [1, 2, 3];
-uint256[] memory actualReturns = [150e18, 200e18, 175e18];
+// After investment period ends
+uint256[] memory investmentIds = [1, 2, 3, 4, 5];
+uint256[] memory actualReturns = [
+    1500e18,  // 1,500 cNGN return
+    2000e18,  // 2,000 cNGN return
+    1750e18,  // 1,750 cNGN return
+    3000e18,  // 3,000 cNGN return
+    2250e18   // 2,250 cNGN return
+];
 
-market.setActualReturns(tokenIds, actualReturns);
+pool.setActualReturns(investmentIds, actualReturns);
 ```
 
-## Testing
+## 🛡️ Security Features
 
-### Run All Tests
+### Multi-Layer Security
 
-```bash
-forge test
-```
+1. **Role-Based Access Control**
+   - `ADMIN_ROLE`: Protocol governance
+   - `POOL_CREATOR_ROLE`: Pool deployment
+   - `POOL_ADMIN_ROLE`: Pool-specific management
+   - `MULTISIG_ROLE`: Fund operations
+   - `EMERGENCY_ROLE`: Circuit breaker
 
-### Run Specific Test File
+2. **Security Mechanisms**
+   - ReentrancyGuard on all external calls
+   - Pausable functionality for emergencies
+   - Input validation and overflow protection
+   - Slippage protection on swaps
+   - Non-transferable position NFTs
 
-```bash
-forge test --match-contract NigerianMoneyMarketTest
-```
-
-### Run with Verbose Output
-
-```bash
-forge test -vvv
-```
-
-### Generate Coverage Report
-
-```bash
-forge coverage
-```
-
-## Security
-
-### Access Control
-
-- **Admin Role**: Can update market configuration and manage multisigs
-- **Multisig Role**: Can collect funds, return funds, and set actual returns
-- **Pauser Role**: Can pause/unpause the contract in emergencies
-
-### Security Features
-
-- **ReentrancyGuard**: Prevents reentrancy attacks
-- **Pausable**: Allows emergency stopping of contract functions
-- **Non-transferable NFTs**: Position tokens cannot be transferred
-- **Input Validation**: Comprehensive validation of all inputs
-- **Safe Math**: Uses OpenZeppelin's SafeERC20 for token operations
+3. **Multisig Requirements**
+   - Minimum 2 signers per pool
+   - Separate multisigs for pools and protocol treasury
+   - Time-locked operations for critical functions
 
 ### Audit Status
 
-🔍 **Audit Pending** - This contract is currently undergoing security audit. Please use with caution in production environments.
+🔍 **Security Audits**
+- [ ] Code4rena Audit (Scheduled Q2 2024)
+- [ ] Certik Audit (Scheduled Q2 2024)
+- [ ] Internal Security Review (Completed)
 
-## Contract Addresses
+## 📈 Pool Examples
 
-### AssetChain Mainnet
+### Government Bonds
+```solidity
+- Name: "Nigerian Treasury Bills"
+- Duration: 91 days
+- Expected Return: 15% APY
+- Min Investment: 10,000 cNGN
+- Max Investment: 100M cNGN
+```
 
-- **Proxy Contract**: `0x...` (To be updated after deployment)
-- **Implementation**: `0x...` (To be updated after deployment)
+### Corporate Investment
+```solidity
+- Name: "Dangote Cement Expansion"
+- Duration: 180 days
+- Expected Return: 25% APY
+- Min Investment: 50,000 cNGN
+- Max Investment: 500M cNGN
+```
 
-### AssetChain Testnet
+### Real Estate Fund
+```solidity
+- Name: "Lagos Property Development"
+- Duration: 365 days
+- Expected Return: 30% APY
+- Min Investment: 100,000 cNGN
+- Max Investment: 1B cNGN
+```
 
-- **Proxy Contract**: `0x...` (To be updated after deployment)
-- **Mock cNGN Token**: `0x...` (To be updated after deployment)
+## 🧪 Testing
 
-## API Reference
+### Run Test Suite
+
+```bash
+# Run all tests
+forge test
+
+# Run with gas reporting
+forge test --gas-report
+
+# Run specific test file
+forge test --match-contract EdenCoreTest
+
+# Run with verbosity
+forge test -vvvv
+
+# Generate coverage report
+forge coverage --report lcov
+```
+
+### Test Categories
+
+- **Unit Tests**: Individual contract functions
+- **Integration Tests**: Cross-contract interactions
+- **Fuzz Tests**: Property-based testing
+- **Invariant Tests**: Protocol invariants
+- **Fork Tests**: Mainnet fork testing
+
+## 🚢 Deployment
+
+### Deploy to AssetChain Mainnet
+
+```bash
+# Deploy full protocol
+forge script script/Deploy.s.sol:DeployScript \
+    --rpc-url $ASSETCHAIN_RPC \
+    --private-key $PRIVATE_KEY \
+    --broadcast \
+    --verify
+```
+
+### Deploy to Testnet
+
+```bash
+# Deploy with mock tokens
+forge script script/Deploy.s.sol:DeployScript \
+    --rpc-url $TESTNET_RPC \
+    --private-key $PRIVATE_KEY \
+    --broadcast
+```
+
+## 📡 API Reference
 
 ### Core Functions
 
-#### `invest(uint256 amount) → uint256`
-Creates a new investment position and returns the NFT token ID.
-
-#### `withdraw(uint256 tokenId)`
-Withdraws a matured investment position.
-
-#### `getInvestment(uint256 tokenId) → Investment`
-Returns detailed information about an investment.
-
-#### `isWithdrawable(uint256 tokenId) → bool`
-Checks if an investment can be withdrawn.
+| Function | Description | Access |
+|----------|-------------|--------|
+| `createPool()` | Deploy new investment pool | POOL_CREATOR |
+| `invest()` | Invest cNGN in pool | Public |
+| `investWithSwap()` | Invest any token via swap | Public |
+| `withdraw()` | Withdraw matured investment | Public |
+| `setActualReturns()` | Set investment returns | MULTISIG |
+| `updatePoolConfig()` | Update pool parameters | POOL_ADMIN |
+| `pause()` | Emergency pause | EMERGENCY |
 
 ### View Functions
 
-#### `getUserInvestments(address user) → uint256[]`
-Returns all investment token IDs for a user.
+| Function | Returns | Description |
+|----------|---------|-------------|
+| `getPoolStats()` | Pool statistics | TVL, utilization, etc. |
+| `getUserInvestments()` | Investment IDs | User's positions |
+| `getInvestment()` | Investment details | Position information |
+| `isWithdrawable()` | Boolean | Withdrawal eligibility |
+| `checkSwapLiquidity()` | Amount & availability | DEX liquidity check |
 
-#### `getContractBalance() → uint256`
-Returns the total cNGN balance in the contract.
+## 🎨 NFT Metadata
 
-#### `marketConfig() → MarketConfig`
-Returns current market configuration.
+Position NFTs feature dynamic, animated SVGs with:
+- Real-time maturity progress
+- Animated backgrounds with brand colors
+- Investment details and returns
+- Pool-specific branding
+- Mobile-responsive design
 
-## Constants
+## 🤝 Contributing
 
-- **MIN_INVESTMENT**: 1,000 cNGN
-- **MAX_INVESTMENT**: 10,000,000 cNGN
-- **DEFAULT_LOCK_DURATION**: 30 days
-- **BASIS_POINTS**: 10,000 (100%)
-
-## Events
-
-```solidity
-event InvestmentCreated(uint256 indexed tokenId, address indexed investor, uint256 amount, uint256 maturityTime);
-event InvestmentWithdrawn(uint256 indexed tokenId, address indexed investor, uint256 principal, uint256 returns);
-event InvestmentMatured(uint256 indexed tokenId, uint256 actualReturn);
-event FundsCollected(address indexed multisig, uint256 amount);
-event FundsReturned(address indexed multisig, uint256 amount);
-event MarketConfigUpdated(uint256 lockDuration, uint256 expectedRate, bool acceptingDeposits);
-event MultisigUpdated(address indexed multisig, bool authorized);
-```
-
-## Contributing
-
-We welcome contributions to the edenVest! Please follow these guidelines:
+We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md).
 
 1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Commit your changes: `git commit -m 'Add amazing feature'`
-4. Push to the branch: `git push origin feature/amazing-feature`
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit changes (`git commit -m 'Add AmazingFeature'`)
+4. Push to branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-### Development Guidelines
+### Development Standards
 
 - Follow [Solidity Style Guide](https://docs.soliditylang.org/en/latest/style-guide.html)
-- Write comprehensive tests for new features
-- Update documentation for any API changes
-- Ensure all tests pass before submitting PR
+- Maintain 100% test coverage for new features
+- Document all external functions
+- Gas optimization is mandatory
+- Security-first approach
 
-## License
+## 📜 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see [LICENSE](LICENSE) file.
 
-## Disclaimer
+## ⚠️ Disclaimer
 
-This software is provided "as is" and any express or implied warranties are disclaimed. The use of this software is at your own risk. Eden Finance is not responsible for any losses that may occur from using this protocol.
+This software is provided "as is" without warranty of any kind. Use at your own risk. Eden Finance is not liable for any losses incurred through the use of this protocol. Always DYOR (Do Your Own Research).
 
-## Support
+## 🌐 Links
 
-For technical support or questions:
+- **Website**: [https://vest.edenfinance.org](https://vest.edenfinance.org)
+- **Documentation**: [https://docs.vest.edenfinance.org](https://docs.vest.edenfinance.org)
+- **Twitter**: [@EdenVest](https://twitter.com/edenvest)
+- **Telegram**: [t.me/edenvest](https://t.me/edenvest)
+- **Discord**: [discord.gg/edenvest](https://discord.gg/edenvest)
+- **Medium**: [medium.com/@edenvest](https://medium.com/@edenvest)
 
-- **Email**: hello@edenfinance.org
-- **Telegram**: [@eden_finance](https://t.me/@eden_finance)
+## 💎 About Eden Finance
 
+Eden Finance is pioneering the future of decentralized finance in emerging markets. We build institutional-grade DeFi infrastructure that bridges traditional finance with blockchain technology, creating unprecedented opportunities for global investors.
 
-## About Eden Finance
-
-Eden Finance is a leading DeFi protocol focused on bringing traditional finance opportunities to the blockchain. We specialize in creating secure, transparent, and profitable investment products for the African financial markets and the world at large.
-
-- **Website**: [https://edenfinance.org](https://edenfinance.org)
-- **Twitter**: [@EdenFinance](https://twitter.com/0xedenfi)
+**Eden Ecosystem:**
+- 🏦 **Eden Vest**: Tokenized investment pools
+- 💸 **Eden Lend**: Collateralized lending protocol
+- 🔄 **Eden Swap**: Decentralized exchange
+- 🌉 **Eden Bridge**: Cross-chain asset transfers
 
