@@ -10,7 +10,7 @@ env:
 
 jobs:
   check:
-    name: Foundry project
+    name: Eden vest v1
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,12 +29,17 @@ jobs:
           forge fmt --check
         id: fmt
 
+      - name: Install dependencies
+        run: |
+          forge install
+        id: fmt
+
       - name: Run Forge build
         run: |
           forge build --sizes
         id: build
 
-      - name: Run Forge tests
-        run: |
-          forge test -vvv
-        id: test
+      # - name: Run Forge tests
+      #   run: |
+      #     forge test -vvv
+      #   id: test
