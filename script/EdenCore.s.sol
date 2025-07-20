@@ -2,11 +2,11 @@
 pragma solidity ^0.8.22;
 
 import "forge-std/Script.sol";
-import "../src/invest/EdenCore.sol";
-import "../src/invest/PoolFactory.sol";
-import "../src/invest/TaxCollector.sol";
-import "../src/invest/SwapRouter.sol";
-import "../src/invest/NFTPositionManager.sol";
+import "../src/vest/EdenCore.sol";
+import "../src/vest/PoolFactory.sol";
+import "../src/vest/TaxCollector.sol";
+import "../src/vest/SwapRouter.sol";
+import "../src/vest/NFTPositionManager.sol";
 import "../src/EdenPoolNFT.sol";
 
 contract DeployEdenCoreScript is Script {
@@ -32,11 +32,11 @@ contract DeployEdenCoreScript is Script {
     }
 
     function getConfig() public view returns (DeploymentConfig memory) {
-        // Default configuration for testnet
+        // Default configuration
         address[] memory signers = new address[](3);
-        signers[0] = 0x54527B09Aeb2Be23F99958Db8f2f827daB863A28; // Replace with actual
-        signers[1] = 0x54527B09Aeb2Be23F99958Db8f2f827daB863A28; // Replace with actual
-        signers[2] = 0x54527B09Aeb2Be23F99958Db8f2f827daB863A28; // Replace with actual
+        signers[0] = 0x54527B09Aeb2Be23F99958Db8f2f827daB863A28;
+        signers[1] = 0x54527B09Aeb2Be23F99958Db8f2f827daB863A28;
+        signers[2] = 0x54527B09Aeb2Be23F99958Db8f2f827daB863A28;
 
         return DeploymentConfig({
             admin: msg.sender,
@@ -127,7 +127,6 @@ contract DeployEdenCoreScript is Script {
 
         vm.stopBroadcast();
 
-        // Log deployment summary
         console.log("\n=== Deployment Summary ===");
         console.log("Eden Core:", address(edenCore));
         console.log("Pool Factory:", address(poolFactory));
@@ -140,7 +139,3 @@ contract DeployEdenCoreScript is Script {
         console.log("Treasury:", config.treasury);
     }
 }
-
-// Deployment commands:
-// forge script script/Deploy.s.sol:DeployScript --rpc-url $RPC_URL --private-key $PRIVATE_KEY --broadcast
-// forge script script/Deploy.s.sol:DeployScript --rpc-url $RPC_URL --ledger --broadcast

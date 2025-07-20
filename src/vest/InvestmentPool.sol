@@ -11,6 +11,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "./interfaces/IInvestmentPool.sol";
 import "./interfaces/ILPToken.sol";
+import "./interfaces/IEdenCore.sol";
 import "./interfaces/INFTPositionManager.sol";
 
 /**
@@ -103,7 +104,7 @@ contract InvestmentPool is
      * @param amount Investment amount
      * @param title Investment title
      * @return tokenId NFT token ID
-     * @return lpAmount LP tokens minted
+     * @return totalLPTokens LP tokens minted
      */
     function invest(address investor, uint256 amount, string memory title)
         external
@@ -111,7 +112,7 @@ contract InvestmentPool is
         onlyEdenCore
         nonReentrant
         whenNotPaused
-        returns (uint256 tokenId, uint256 lpAmount)
+        returns (uint256 tokenId, uint256 totalLPTokens)
     {
         require(poolConfig.acceptingDeposits, "Deposits paused");
         require(amount >= poolConfig.minInvestment, "Below minimum");
@@ -125,6 +126,18 @@ contract InvestmentPool is
         uint256 maturityTime = block.timestamp + poolConfig.lockDuration;
         uint256 expectedReturn = _calculateExpectedReturn(amount);
 
+        // Mint LP tokens
+        totalLPTokens = _calculateLPTokens(amount);
+
+        uint256 poolTaxRate = IInvestmentPool(address(this)).taxRate();
+        IEdenCore edenCore_ = IEdenCore(edenCore);
+
+        uint256 effectiveTaxRate = poolTaxRate > 0 ? poolTaxRate : edenCore_.globalTaxRate();
+
+        uint256 taxAmount = (totalLPTokens * effectiveTaxRate) / BASIS_POINTS;
+        uint256 userLPTokens = totalLPTokens - taxAmount;
+
+
         investments[investmentId] = Investment({
             investor: investor,
             amount: amount,
@@ -132,15 +145,16 @@ contract InvestmentPool is
             depositTime: block.timestamp,
             maturityTime: maturityTime,
             expectedReturn: expectedReturn,
-            isWithdrawn: false
+            isWithdrawn: false,
+            lpTokens: userLPTokens
         });
 
         userInvestments[investor].push(investmentId);
         totalDeposited += amount;
 
-        // Mint LP tokens
-        lpAmount = _calculateLPTokens(amount);
-        ILPToken(lpToken).mint(investor, lpAmount);
+
+        ILPToken(lpToken).mint(investor, userLPTokens);
+        ILPToken(lpToken).mint(edenCore, taxAmount); // Send tax portion directly to EdenCore
 
         // Mint NFT
         tokenId =
@@ -151,7 +165,7 @@ contract InvestmentPool is
         // Transfer funds to multisig
         IERC20(cNGN).safeTransferFrom(edenCore, poolMultisig, amount);
 
-        emit InvestmentCreated(investmentId, investor, amount, lpAmount, tokenId);
+        emit InvestmentCreated(investmentId, investor, amount, totalLPTokens, tokenId);
     }
 
     /**
@@ -176,9 +190,9 @@ contract InvestmentPool is
         require(block.timestamp >= investment.maturityTime, "Not matured");
         require(IERC721(nftManager).ownerOf(tokenId) == investor, "NFT not owned");
 
-        // Calculate required LP tokens
-        uint256 requiredLPTokens = _calculateLPTokens(investment.amount);
-        require(lpAmount >= requiredLPTokens, "Insufficient LP tokens");
+        uint256 requiredLPTokens = investment.lpTokens;
+
+       require(lpAmount >= investment.lpTokens, "Insufficient LP tokens");
 
         investment.isWithdrawn = true;
 

@@ -53,7 +53,6 @@ graph TB
 |----------|-------------|---------------|
 | **EdenCore** | Main protocol entry point | `createPool()`, `invest()`, `withdraw()` |
 | **PoolFactory** | Deploys investment pools efficiently | `createPool()` |
-| **InvestmentPool** | Individual pool logic | `invest()`, `withdraw()`, `setActualReturns()` |
 | **LPToken** | ERC20 pool share tokens | `mint()`, `burn()` |
 | **TaxCollector** | Tax management system | `collectTax()`, `withdrawTax()` |
 | **SwapRouter** | DEX integration | `swapExactTokensForTokens()` |
@@ -82,7 +81,7 @@ forge install
 forge build
 
 # Run tests
-forge test
+forge test -vvv --gas-limit 60000000
 ```
 
 ### Environment Setup
@@ -155,7 +154,7 @@ EdenCore.InvestmentParams memory params = EdenCore.InvestmentParams({
 (uint256 nftId, uint256 lpTokens) = edenCore.investWithSwap(params);
 ```
 
-#### Using LP Tokens as Collateral
+#### Using LP Tokens as Collateral ( Eden Lend )
 
 ```solidity
 // Approve LP tokens for Eden Lending Protocol
@@ -215,21 +214,6 @@ adminInterface.updatePoolConfig(poolAddress, config);
 
 ### For Multisig Operations
 
-#### Setting Actual Returns
-
-```solidity
-// After investment period ends
-uint256[] memory investmentIds = [1, 2, 3, 4, 5];
-uint256[] memory actualReturns = [
-    1500e18,  // 1,500 cNGN return
-    2000e18,  // 2,000 cNGN return
-    1750e18,  // 1,750 cNGN return
-    3000e18,  // 3,000 cNGN return
-    2250e18   // 2,250 cNGN return
-];
-
-pool.setActualReturns(investmentIds, actualReturns);
-```
 
 ## 🛡️ Security Features
 
@@ -257,9 +241,7 @@ pool.setActualReturns(investmentIds, actualReturns);
 ### Audit Status
 
 🔍 **Security Audits**
-- [ ] Code4rena Audit (Scheduled Q2 2024)
-- [ ] Certik Audit (Scheduled Q2 2024)
-- [ ] Internal Security Review (Completed)
+- [ ] Internal Security Review
 
 ## 📈 Pool Examples
 
@@ -325,21 +307,14 @@ forge coverage --report lcov
 
 ```bash
 # Deploy full protocol
-forge script script/Deploy.s.sol:DeployScript \
-    --rpc-url $ASSETCHAIN_RPC \
-    --private-key $PRIVATE_KEY \
-    --broadcast \
-    --verify
+forge script --chain 42421 script/EdenCore.s.sol:DeployEdenCoreScript --rpc-url $ASSETCHAIN_RPC --broadcast --private-key $PRIVATE_KEY --gas-limit 60000000
 ```
 
 ### Deploy to Testnet
 
 ```bash
 # Deploy with mock tokens
-forge script script/Deploy.s.sol:DeployScript \
-    --rpc-url $TESTNET_RPC \
-    --private-key $PRIVATE_KEY \
-    --broadcast
+forge script --chain 42421 script/EdenCore.s.sol:DeployEdenCoreScript --rpc-url $TESTNET_RPC --broadcast --private-key $PRIVATE_KEY --gas-limit 60000000
 ```
 
 ## 📡 API Reference
@@ -352,7 +327,6 @@ forge script script/Deploy.s.sol:DeployScript \
 | `invest()` | Invest cNGN in pool | Public |
 | `investWithSwap()` | Invest any token via swap | Public |
 | `withdraw()` | Withdraw matured investment | Public |
-| `setActualReturns()` | Set investment returns | MULTISIG |
 | `updatePoolConfig()` | Update pool parameters | POOL_ADMIN |
 | `pause()` | Emergency pause | EMERGENCY |
 
@@ -369,6 +343,7 @@ forge script script/Deploy.s.sol:DeployScript \
 ## 🎨 NFT Metadata
 
 Position NFTs feature dynamic, animated SVGs with:
+
 - Real-time maturity progress
 - Animated backgrounds with brand colors
 - Investment details and returns
@@ -405,18 +380,15 @@ This software is provided "as is" without warranty of any kind. Use at your own 
 
 - **Website**: [https://vest.edenfinance.org](https://vest.edenfinance.org)
 - **Documentation**: [https://docs.vest.edenfinance.org](https://docs.vest.edenfinance.org)
-- **Twitter**: [@EdenVest](https://twitter.com/edenvest)
-- **Telegram**: [t.me/edenvest](https://t.me/edenvest)
-- **Discord**: [discord.gg/edenvest](https://discord.gg/edenvest)
-- **Medium**: [medium.com/@edenvest](https://medium.com/@edenvest)
+- **Twitter**: [@EdenVest](https://twitter.com/0xedenfi)
 
 ## 💎 About Eden Finance
 
 Eden Finance is pioneering the future of decentralized finance in emerging markets. We build institutional-grade DeFi infrastructure that bridges traditional finance with blockchain technology, creating unprecedented opportunities for global investors.
 
 **Eden Ecosystem:**
+
 - 🏦 **Eden Vest**: Tokenized investment pools
 - 💸 **Eden Lend**: Collateralized lending protocol
 - 🔄 **Eden Swap**: Decentralized exchange
 - 🌉 **Eden Bridge**: Cross-chain asset transfers
-

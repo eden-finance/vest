@@ -143,13 +143,14 @@ contract EdenCore is Initializable, AccessControlUpgradeable, PausableUpgradeabl
         if (!isRegisteredPool[pool]) revert InvalidPool();
         if (!poolInfo[pool].isActive) revert PoolNotActive();
 
+        // transfer cNGN to this contract and approve the pool to spend cNGN
         IERC20(cNGN).transferFrom(msg.sender, address(this), amount);
         IERC20(cNGN).approve(pool, amount);
 
         (tokenId, lpTokens) = IInvestmentPool(pool).invest(msg.sender, amount, title);
 
         // Handle tax collection
-        uint256 taxAmount = _collectTax(pool, msg.sender, lpTokens);
+        uint256 taxAmount = _collectTax(pool, lpTokens);
         lpTokens -= taxAmount;
 
         emit InvestmentMade(pool, msg.sender, tokenId, amount, lpTokens);
@@ -186,7 +187,7 @@ contract EdenCore is Initializable, AccessControlUpgradeable, PausableUpgradeabl
         (tokenId, lpTokens) = IInvestmentPool(params.pool).invest(msg.sender, amountOut, params.title);
 
         // Handle tax collection
-        uint256 taxAmount = _collectTax(params.pool, msg.sender, lpTokens);
+        uint256 taxAmount = _collectTax(params.pool, lpTokens);
         lpTokens -= taxAmount;
 
         emit InvestmentMade(params.pool, msg.sender, tokenId, amountOut, lpTokens);
@@ -354,11 +355,10 @@ contract EdenCore is Initializable, AccessControlUpgradeable, PausableUpgradeabl
     /**
      * @dev Collect tax on LP tokens
      * @param pool Pool address
-     * @param investor Investor address
      * @param lpAmount LP token amount
      * @return taxAmount Tax collected
      */
-    function _collectTax(address pool, address investor, uint256 lpAmount) internal returns (uint256 taxAmount) {
+    function _collectTax(address pool, uint256 lpAmount) internal returns (uint256 taxAmount) {
         uint256 poolTaxRate = IInvestmentPool(pool).taxRate();
         uint256 effectiveTaxRate = poolTaxRate > 0 ? poolTaxRate : globalTaxRate;
 
@@ -366,7 +366,6 @@ contract EdenCore is Initializable, AccessControlUpgradeable, PausableUpgradeabl
             taxAmount = (lpAmount * effectiveTaxRate) / BASIS_POINTS;
             address lpToken = poolInfo[pool].lpToken;
 
-            IERC20(lpToken).transferFrom(investor, address(this), taxAmount);
             IERC20(lpToken).approve(address(taxCollector), taxAmount);
 
             taxCollector.collectTax(lpToken, taxAmount, pool);

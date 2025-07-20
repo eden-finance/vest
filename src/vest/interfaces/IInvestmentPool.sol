@@ -38,6 +38,7 @@ interface IInvestmentPool {
         uint256 maturityTime;
         uint256 expectedReturn;
         bool isWithdrawn;
+        uint256 lpTokens;
     }
 
     event InvestmentCreated(
