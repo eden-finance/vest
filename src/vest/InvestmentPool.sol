@@ -137,7 +137,6 @@ contract InvestmentPool is
         uint256 taxAmount = (totalLPTokens * effectiveTaxRate) / BASIS_POINTS;
         uint256 userLPTokens = totalLPTokens - taxAmount;
 
-
         investments[investmentId] = Investment({
             investor: investor,
             amount: amount,
@@ -151,8 +150,6 @@ contract InvestmentPool is
 
         userInvestments[investor].push(investmentId);
         totalDeposited += amount;
-
-
         ILPToken(lpToken).mint(investor, userLPTokens);
         ILPToken(lpToken).mint(edenCore, taxAmount); // Send tax portion directly to EdenCore
 
@@ -191,8 +188,7 @@ contract InvestmentPool is
         require(IERC721(nftManager).ownerOf(tokenId) == investor, "NFT not owned");
 
         uint256 requiredLPTokens = investment.lpTokens;
-
-       require(lpAmount >= investment.lpTokens, "Insufficient LP tokens");
+        require(lpAmount >= investment.lpTokens, "Insufficient LP tokens");
 
         investment.isWithdrawn = true;
 
