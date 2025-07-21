@@ -6,7 +6,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "./interfaces/IPoolFactory.sol";
 import "./interfaces/IInvestmentPool.sol";
 import "./interfaces/ITaxCollector.sol";
@@ -18,7 +18,13 @@ import "./interfaces/INFTPositionManager.sol";
  * @notice Main entry point for Eden Finance investment protocol
  * @dev Manages pools, investments, and protocol configuration
  */
-contract EdenCore is Initializable, AccessControlUpgradeable, PausableUpgradeable, UUPSUpgradeable {
+contract EdenCore is
+    Initializable,
+    AccessControlUpgradeable,
+    PausableUpgradeable,
+    UUPSUpgradeable,
+    ReentrancyGuardUpgradeable
+{
     // ============ ROLES ============
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant POOL_CREATOR_ROLE = keccak256("POOL_CREATOR_ROLE");
@@ -68,7 +74,7 @@ contract EdenCore is Initializable, AccessControlUpgradeable, PausableUpgradeabl
     );
     event TaxRateUpdated(uint256 oldRate, uint256 newRate);
     event TreasuryUpdated(address oldTreasury, address newTreasury);
-    event EmergencyWithdraw(address token, uint256 amount);
+    event EmergencyWithdraw(address token, uint256 amount, address treasury, string reason, address admin);
 
     // ============ ERRORS ============
     error InvalidPool();
@@ -79,6 +85,12 @@ contract EdenCore is Initializable, AccessControlUpgradeable, PausableUpgradeabl
     error TransferFailed();
     error InsufficientLiquidity();
     error SwapFailed();
+    error DeadlineExpired();
+    error SwapInconsistency();
+    error InvalidLockDuration();
+    error InvalidRate();
+    error InvalidPoolName();
+    error InsufficientBalance();
 
     // ============ INITIALIZATION ============
     function initialize(address _cNGN, address _treasury, address _admin, uint256 _taxRate) public initializer {
@@ -111,6 +123,15 @@ contract EdenCore is Initializable, AccessControlUpgradeable, PausableUpgradeabl
         onlyRole(POOL_CREATOR_ROLE)
         returns (address pool)
     {
+        if (bytes(poolParams.name).length == 0) revert InvalidPoolName();
+        if (poolParams.admin == address(0)) revert InvalidAddress();
+        if (poolParams.poolMultisig == address(0)) revert InvalidAddress();
+        if (poolParams.minInvestment == 0) revert InvalidAmount();
+        if (poolParams.maxInvestment < poolParams.minInvestment) revert InvalidAmount();
+        if (poolParams.lockDuration < 1 days) revert InvalidLockDuration();
+        if (poolParams.expectedRate > 10000) revert InvalidRate(); // Max 100% APY
+        if (poolParams.taxRate > MAX_TAX_RATE) revert InvalidTaxRate();
+
         pool = poolFactory.createPool(poolParams);
 
         isRegisteredPool[pool] = true;
@@ -138,6 +159,7 @@ contract EdenCore is Initializable, AccessControlUpgradeable, PausableUpgradeabl
     function invest(address pool, uint256 amount, string memory title)
         external
         whenNotPaused
+        nonReentrant
         returns (uint256 tokenId, uint256 lpTokens)
     {
         if (!isRegisteredPool[pool]) revert InvalidPool();
@@ -147,11 +169,7 @@ contract EdenCore is Initializable, AccessControlUpgradeable, PausableUpgradeabl
         IERC20(cNGN).transferFrom(msg.sender, address(this), amount);
         IERC20(cNGN).approve(pool, amount);
 
-        (tokenId, lpTokens) = IInvestmentPool(pool).invest(msg.sender, amount, title);
-
-        // Handle tax collection
-        uint256 taxAmount = _collectTax(pool, lpTokens);
-        lpTokens -= taxAmount;
+        (tokenId, lpTokens,) = IInvestmentPool(pool).invest(msg.sender, amount, title);
 
         emit InvestmentMade(pool, msg.sender, tokenId, amount, lpTokens);
     }
@@ -163,32 +181,39 @@ contract EdenCore is Initializable, AccessControlUpgradeable, PausableUpgradeabl
     function investWithSwap(InvestmentParams memory params)
         external
         whenNotPaused
+        nonReentrant
         returns (uint256 tokenId, uint256 lpTokens)
     {
         if (!isRegisteredPool[params.pool]) revert InvalidPool();
         if (!poolInfo[params.pool].isActive) revert PoolNotActive();
+        if (params.deadline < block.timestamp) revert DeadlineExpired();
+
+        uint256 initialBalance = IERC20(cNGN).balanceOf(address(this));
 
         // Transfer tokens from user
         IERC20(params.tokenIn).transferFrom(msg.sender, address(this), params.amountIn);
 
         // Check liquidity and perform swap
         uint256 expectedOut = swapRouter.getAmountOut(params.tokenIn, cNGN, params.amountIn);
-        if (expectedOut < params.minAmountOut) revert InsufficientLiquidity();
+
+        uint256 maxSlippageBasisPoints = 100; // 1% maximum slippage
+        uint256 adjustedMinOut = (expectedOut * (BASIS_POINTS - maxSlippageBasisPoints)) / BASIS_POINTS;
+
+        if (adjustedMinOut < params.minAmountOut) revert InsufficientLiquidity();
 
         IERC20(params.tokenIn).approve(address(swapRouter), params.amountIn);
-        uint256 amountOut = swapRouter.swapExactTokensForTokens(
-            params.tokenIn, cNGN, params.amountIn, params.minAmountOut, params.deadline
-        );
+        uint256 effectiveMinOut = adjustedMinOut > params.minAmountOut ? adjustedMinOut : params.minAmountOut;
+
+        uint256 amountOut =
+            swapRouter.swapExactTokensForTokens(params.tokenIn, cNGN, params.amountIn, effectiveMinOut, params.deadline);
 
         if (amountOut == 0) revert SwapFailed();
+        uint256 finalBalance = IERC20(cNGN).balanceOf(address(this));
+        if (finalBalance != initialBalance + amountOut) revert SwapInconsistency();
 
         // Invest the swapped cNGN
         IERC20(cNGN).approve(params.pool, amountOut);
-        (tokenId, lpTokens) = IInvestmentPool(params.pool).invest(msg.sender, amountOut, params.title);
-
-        // Handle tax collection
-        uint256 taxAmount = _collectTax(params.pool, lpTokens);
-        lpTokens -= taxAmount;
+        (tokenId, lpTokens,) = IInvestmentPool(params.pool).invest(msg.sender, amountOut, params.title);
 
         emit InvestmentMade(params.pool, msg.sender, tokenId, amountOut, lpTokens);
     }
@@ -199,7 +224,11 @@ contract EdenCore is Initializable, AccessControlUpgradeable, PausableUpgradeabl
      * @param tokenId NFT token ID
      * @param lpTokenAmount Amount of LP tokens to return
      */
-    function withdraw(address pool, uint256 tokenId, uint256 lpTokenAmount) external returns (uint256 withdrawAmount) {
+    function withdraw(address pool, uint256 tokenId, uint256 lpTokenAmount)
+        external
+        nonReentrant
+        returns (uint256 withdrawAmount)
+    {
         if (!isRegisteredPool[pool]) revert InvalidPool();
 
         // Transfer LP tokens from user to pool
@@ -224,22 +253,25 @@ contract EdenCore is Initializable, AccessControlUpgradeable, PausableUpgradeabl
      * @notice Get active pools
      * @return Array of active pool addresses
      */
-    function getActivePools() external view returns (address[] memory) {
-        uint256 activeCount = 0;
-        for (uint256 i = 0; i < allPools.length; i++) {
-            if (poolInfo[allPools[i]].isActive) activeCount++;
-        }
-
-        address[] memory activePools = new address[](activeCount);
-        uint256 index = 0;
-        for (uint256 i = 0; i < allPools.length; i++) {
-            if (poolInfo[allPools[i]].isActive) {
-                activePools[index++] = allPools[i];
-            }
-        }
-
-        return activePools;
+   function getActivePools() external view returns (address[] memory) {
+    address[] memory allPoolsMemory = allPools;
+    uint256 activeCount = 0;
+    
+    for (uint256 i = 0; i < allPoolsMemory.length; i++) {
+        if (poolInfo[allPoolsMemory[i]].isActive) activeCount++;
     }
+
+    address[] memory activePools = new address[](activeCount);
+    uint256 index = 0;
+    
+    for (uint256 i = 0; i < allPoolsMemory.length; i++) {
+        if (poolInfo[allPoolsMemory[i]].isActive) {
+            activePools[index++] = allPoolsMemory[i];
+        }
+    }
+
+    return activePools;
+}
 
     /**
      * @notice Check swap liquidity
@@ -345,31 +377,14 @@ contract EdenCore is Initializable, AccessControlUpgradeable, PausableUpgradeabl
      * @param token Token address
      * @param amount Amount to withdraw
      */
-    function emergencyWithdraw(address token, uint256 amount) external onlyRole(EMERGENCY_ROLE) {
+    function emergencyWithdraw(address token, uint256 amount, string memory reason) external onlyRole(EMERGENCY_ROLE) {
+
+         uint256 balance = IERC20(token).balanceOf(address(this));
+    if (amount > balance) revert InsufficientBalance();
+
         IERC20(token).transfer(protocolTreasury, amount);
-        emit EmergencyWithdraw(token, amount);
-    }
 
-    // ============ INTERNAL FUNCTIONS ============
-
-    /**
-     * @dev Collect tax on LP tokens
-     * @param pool Pool address
-     * @param lpAmount LP token amount
-     * @return taxAmount Tax collected
-     */
-    function _collectTax(address pool, uint256 lpAmount) internal returns (uint256 taxAmount) {
-        uint256 poolTaxRate = IInvestmentPool(pool).taxRate();
-        uint256 effectiveTaxRate = poolTaxRate > 0 ? poolTaxRate : globalTaxRate;
-
-        if (effectiveTaxRate > 0 && address(taxCollector) != address(0)) {
-            taxAmount = (lpAmount * effectiveTaxRate) / BASIS_POINTS;
-            address lpToken = poolInfo[pool].lpToken;
-
-            IERC20(lpToken).approve(address(taxCollector), taxAmount);
-
-            taxCollector.collectTax(lpToken, taxAmount, pool);
-        }
+        emit EmergencyWithdraw(token, amount, protocolTreasury, reason, msg.sender);
     }
 
     /**

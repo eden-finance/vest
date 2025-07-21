@@ -22,6 +22,7 @@ contract PoolFactory is IPoolFactory, Ownable {
     address public poolImplementation;
     address public lpTokenImplementation;
     address public edenCore;
+    address public taxCollector;
     address public nftManager;
 
     mapping(address => bool) public isPool;
@@ -80,6 +81,7 @@ contract PoolFactory is IPoolFactory, Ownable {
             lockDuration: params.lockDuration,
             minInvestment: params.minInvestment,
             maxInvestment: params.maxInvestment,
+            taxCollector: params.taxCollector,
             utilizationCap: params.utilizationCap,
             expectedRate: params.expectedRate,
             taxRate: params.taxRate
@@ -96,6 +98,15 @@ contract PoolFactory is IPoolFactory, Ownable {
     }
 
     // ============ ADMIN FUNCTIONS ============
+
+    /**
+     * @notice Set Tax Collector address
+     * @param _taxCollector Tax Collector contract address
+     */
+    function setTaxCollector(address _taxCollector) external onlyOwner {
+        require(_taxCollector != address(0), "Invalid address");
+        taxCollector = _taxCollector;
+    }
 
     /**
      * @notice Set Eden Core address

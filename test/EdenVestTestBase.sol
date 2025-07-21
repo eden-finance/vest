@@ -95,7 +95,8 @@ contract EdenVestTestBase is Test {
             maxInvestment: 1000000e18,
             utilizationCap: 10000000e18,
             expectedRate: 1500, // 15% APY
-            taxRate: 0 // Use global rate
+            taxRate: 0, // Use global rate
+            taxCollector: address(taxCollector)
         });
 
         // Fund test accounts

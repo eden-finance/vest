@@ -10,6 +10,7 @@ interface IInvestmentPool {
         address nftManager;
         address edenCore;
         address admin;
+        address taxCollector;
         address[] multisigSigners;
         uint256 lockDuration;
         uint256 minInvestment;
@@ -51,7 +52,7 @@ interface IInvestmentPool {
 
     function invest(address investor, uint256 amount, string memory title)
         external
-        returns (uint256 tokenId, uint256 lpAmount);
+        returns (uint256 tokenId, uint256 userLPTokens, uint256 taxAmount);
     function withdraw(address investor, uint256 tokenId, uint256 lpAmount) external returns (uint256 withdrawAmount);
     function lpToken() external view returns (address);
     function taxRate() external view returns (uint256);

@@ -26,15 +26,6 @@ contract TaxCollector is ITaxCollector, Ownable {
         treasury = _treasury;
     }
 
-    function collectTax(address token, uint256 amount, address pool) external override {
-        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
-
-        poolTaxCollected[pool] += amount;
-        tokenTaxBalance[token] += amount;
-
-        emit TaxCollected(token, amount, pool);
-    }
-
     function withdrawTax(address token) external onlyOwner {
         uint256 balance = tokenTaxBalance[token];
         require(balance > 0, "No tax to withdraw");

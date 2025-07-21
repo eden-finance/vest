@@ -43,6 +43,7 @@ contract InvestmentPool is
     address public poolMultisig;
     address public nftManager;
     address public edenCore;
+    address public taxCollector;
 
     PoolConfig public poolConfig;
     uint256 public totalDeposited;
@@ -75,6 +76,7 @@ contract InvestmentPool is
         poolMultisig = params.poolMultisig;
         nftManager = params.nftManager;
         edenCore = params.edenCore;
+        taxCollector = params.taxCollector;
 
         poolConfig = PoolConfig({
             name: params.name,
@@ -104,7 +106,8 @@ contract InvestmentPool is
      * @param amount Investment amount
      * @param title Investment title
      * @return tokenId NFT token ID
-     * @return totalLPTokens LP tokens minted
+     * @return userLPTokens LP tokens minted
+     * @return taxAmount tokens minted for tax
      */
     function invest(address investor, uint256 amount, string memory title)
         external
@@ -112,7 +115,7 @@ contract InvestmentPool is
         onlyEdenCore
         nonReentrant
         whenNotPaused
-        returns (uint256 tokenId, uint256 totalLPTokens)
+        returns (uint256 tokenId, uint256 userLPTokens, uint256 taxAmount)
     {
         require(poolConfig.acceptingDeposits, "Deposits paused");
         require(amount >= poolConfig.minInvestment, "Below minimum");
@@ -127,15 +130,15 @@ contract InvestmentPool is
         uint256 expectedReturn = _calculateExpectedReturn(amount);
 
         // Mint LP tokens
-        totalLPTokens = _calculateLPTokens(amount);
+        uint256 totalLPTokens = _calculateLPTokens(amount);
 
         uint256 poolTaxRate = IInvestmentPool(address(this)).taxRate();
         IEdenCore edenCore_ = IEdenCore(edenCore);
 
         uint256 effectiveTaxRate = poolTaxRate > 0 ? poolTaxRate : edenCore_.globalTaxRate();
 
-        uint256 taxAmount = (totalLPTokens * effectiveTaxRate) / BASIS_POINTS;
-        uint256 userLPTokens = totalLPTokens - taxAmount;
+        taxAmount = (totalLPTokens * effectiveTaxRate) / BASIS_POINTS;
+        userLPTokens = totalLPTokens - taxAmount;
 
         investments[investmentId] = Investment({
             investor: investor,
@@ -151,7 +154,7 @@ contract InvestmentPool is
         userInvestments[investor].push(investmentId);
         totalDeposited += amount;
         ILPToken(lpToken).mint(investor, userLPTokens);
-        ILPToken(lpToken).mint(edenCore, taxAmount); // Send tax portion directly to EdenCore
+        ILPToken(lpToken).mint(taxCollector, taxAmount); // Send tax portion directly to taxcollector
 
         // Mint NFT
         tokenId =
@@ -193,6 +196,7 @@ contract InvestmentPool is
         investment.isWithdrawn = true;
 
         withdrawAmount += investment.expectedReturn;
+        totalWithdrawn += withdrawAmount;
 
         // Burn LP tokens
         ILPToken(lpToken).burn(address(this), requiredLPTokens);
