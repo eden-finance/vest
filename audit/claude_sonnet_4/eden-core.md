@@ -20,11 +20,11 @@ This audit focuses on the EdenCore contract, which serves as the main entry poin
 | EC-02 | Tax collection vulnerability in LP token transfer | High | Closed |
 | EC-03 | Missing slippage protection in swap operations | Medium | Closed |
 | EC-04 | Potential reentrancy in investment functions | Medium | Closed |
-| EC-05 | Centralized control over protocol parameters | Medium | Open |
+| EC-05 | Centralized control over protocol parameters | Medium | Closed |
 | EC-06 | Missing input validation for pool creation | Medium | Closed |
 | EC-07 | Emergency withdraw lacks event details | Low | Closed |
 | EC-08 | Inconsistent error handling | Low | Open |
-| EC-09 | Missing deadline validation in investments | Low | Open |
+| EC-09 | Missing deadline validation in investments | Low | Closed |
 | EC-10 | Gas optimization opportunities | Informational | Closed |
 
 ## Detailed Findings
@@ -353,7 +353,7 @@ function invest(address pool, uint256 amount, string memory title)
 The regular `invest` function doesn't have deadline protection, unlike `investWithSwap`, which could lead to transactions being executed at unintended times.
 
 **Locations**:
-- `EdenCore.sol:159-175` (`invest` function)
+- `EdenCore.sol:459-480` (`invest` function)
 
 **Recommendation**:  
 Add deadline parameter to the invest function:
@@ -377,7 +377,8 @@ function invest(address pool, uint256 amount, string memory title, uint256 deadl
 Several gas optimization opportunities exist in the contract, including redundant storage reads and inefficient loops.
 
 **Locations**:
-- `EdenCore.sol:256-274` (`getActivePools` function)
+
+- `EdenCore.sol:538-556` (`getActivePools` function)
 
 **Recommendation**:  
 Optimize gas usage through caching and efficient data structures:

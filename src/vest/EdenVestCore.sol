@@ -456,14 +456,16 @@ contract EdenCore is
         emit PoolCreated(pool, poolParams.name, poolParams.admin, poolInfo[pool].lpToken);
     }
 
-    function invest(address pool, uint256 amount, string memory title)
+    function invest(address pool, uint256 amount, string memory title,uint256 deadline)
         external
         whenNotPaused
         nonReentrant
+        
         returns (uint256 tokenId, uint256 lpTokens)
     {
         if (!isRegisteredPool[pool]) revert InvalidPool();
         if (!poolInfo[pool].isActive) revert PoolNotActive();
+        if (deadline != 0 && deadline < block.timestamp) revert DeadlineExpired();
 
         IERC20(cNGN).transferFrom(msg.sender, address(this), amount);
         IERC20(cNGN).approve(pool, amount);
