@@ -154,7 +154,7 @@ contract InvestmentPool is
         userInvestments[investor].push(investmentId);
         totalDeposited += amount;
         ILPToken(lpToken).mint(investor, userLPTokens);
-        ILPToken(lpToken).mint(taxCollector, taxAmount); // Send tax portion directly to taxcollector
+        ILPToken(lpToken).mint(taxCollector, taxAmount);
 
         // Mint NFT
         tokenId =

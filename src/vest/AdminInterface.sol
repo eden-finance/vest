@@ -3,7 +3,7 @@ pragma solidity ^0.8.22;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./interfaces/IInvestmentPool.sol";
-import "./EdenCore.sol";
+import "./EdenVestCore.sol";
 
 /**
  * @title AdminInterface
@@ -29,7 +29,6 @@ contract AdminInterface is AccessControl {
         uint256 totalValueLocked;
         uint256 totalPools;
         uint256 activePools;
-        uint256 totalTaxCollected;
         uint256 globalTaxRate;
     }
 
@@ -69,7 +68,6 @@ contract AdminInterface is AccessControl {
             totalValueLocked: tvl,
             totalPools: pools.length,
             activePools: activePools,
-            totalTaxCollected: 0, // Would need tax collector integration
             globalTaxRate: edenCore.globalTaxRate()
         });
     }
@@ -150,20 +148,6 @@ contract AdminInterface is AccessControl {
     // ============ PROTOCOL CONFIGURATION ============
 
     /**
-     * @notice Update global tax rate
-     */
-    function setGlobalTaxRate(uint256 rate) external onlyRole(ADMIN_ROLE) {
-        edenCore.setGlobalTaxRate(rate);
-    }
-
-    /**
-     * @notice Update protocol treasury
-     */
-    function setProtocolTreasury(address treasury) external onlyRole(ADMIN_ROLE) {
-        edenCore.setProtocolTreasury(treasury);
-    }
-
-    /**
      * @notice Update contract connections
      */
     function updateProtocolContracts(address poolFactory, address taxCollector, address swapRouter, address nftManager)
@@ -177,42 +161,6 @@ contract AdminInterface is AccessControl {
     }
 
     // ============ EMERGENCY FUNCTIONS ============
-
-    /**
-     * @notice Pause entire protocol
-     */
-    function pauseProtocol() external onlyRole(ADMIN_ROLE) {
-        edenCore.pause();
-        emit EmergencyAction("PROTOCOL_PAUSED", address(edenCore), 0);
-    }
-
-    /**
-     * @notice Unpause entire protocol
-     */
-    function unpauseProtocol() external onlyRole(ADMIN_ROLE) {
-        edenCore.unpause();
-        emit EmergencyAction("PROTOCOL_UNPAUSED", address(edenCore), 0);
-    }
-
-    /**
-     * @notice Emergency withdraw from Eden Core
-     */
-    function emergencyWithdraw(address token, uint256 amount) external onlyRole(ADMIN_ROLE) {
-        edenCore.emergencyWithdraw(token, amount);
-        emit EmergencyAction("EMERGENCY_WITHDRAW", token, amount);
-    }
-
-    // ============ BATCH OPERATIONS ============
-
-    /**
-     * @notice Batch pause multiple pools
-     */
-    function batchPausePools(address[] calldata pools) external onlyRole(OPERATOR_ROLE) {
-        for (uint256 i = 0; i < pools.length; i++) {
-            IInvestmentPool(pools[i]).pause();
-            emit PoolPaused(pools[i]);
-        }
-    }
 
     /**
      * @notice Batch update pool configurations

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.22;
 
 import "forge-std/Script.sol";
-import "../src/vest/EdenCore.sol";
+import "../src/vest/EdenVestCore.sol";
 import "../src/vest/PoolFactory.sol";
 import "../src/vest/TaxCollector.sol";
 import "../src/vest/SwapRouter.sol";
@@ -63,34 +63,27 @@ contract DeployEdenCoreScript is Script {
 
         vm.startBroadcast();
 
-        // 1. Deploy NFT Renderer
         EdenPoolNFT renderer = new EdenPoolNFT();
         console.log("EdenPoolNFT Renderer deployed at:", address(renderer));
 
-        // 2. Deploy NFT Position Manager
         NFTPositionManager nftManager = new NFTPositionManager(address(renderer), config.admin);
         console.log("NFT Position Manager deployed at:", address(nftManager));
 
-        // 3. Deploy Tax Collector
-        TaxCollector taxCollector = new TaxCollector(config.treasury, config.admin);
-        console.log("Tax Collector deployed at:", address(taxCollector));
-
-        // 4. Deploy Swap Router
         SwapRouter swapRouter = new SwapRouter(config.uniswapRouter, config.uniswapQuoter, config.admin);
         console.log("Swap Router deployed at:", address(swapRouter));
 
-        // 5. Deploy Pool Factory
         PoolFactory poolFactory = new PoolFactory(config.admin);
         console.log("Pool Factory deployed at:", address(poolFactory));
 
-        // 6. Deploy Eden Core
         EdenCore edenCore = new EdenCore();
         console.log("Eden Core deployed at:", address(edenCore));
 
-        // 7. Initialize Eden Core
-        edenCore.initialize(config.cNGN, config.treasury, config.admin, config.globalTaxRate);
+        edenCore.initialize(config.cNGN, config.treasury, config.admin, config.globalTaxRate, config.multisigSigners);
 
-        // 8. Set contract connections
+        TaxCollector taxCollector = new TaxCollector(config.treasury, config.admin, address(edenCore));
+
+        console.log("Tax Collector deployed at:", address(taxCollector));
+
         poolFactory.setEdenCore(address(edenCore));
         poolFactory.setNFTManager(address(nftManager));
 
@@ -99,11 +92,9 @@ contract DeployEdenCoreScript is Script {
         edenCore.setSwapRouter(address(swapRouter));
         edenCore.setNFTManager(address(nftManager));
 
-        // 9. Grant pool creator role
         edenCore.grantRole(edenCore.POOL_CREATOR_ROLE(), config.admin);
         edenCore.grantRole(edenCore.MINTER_ROLE(), config.admin);
 
-        // 10. Create first pool (Nigerian Money Market)
         IPoolFactory.PoolParams memory poolParams = IPoolFactory.PoolParams({
             name: config.poolName,
             symbol: config.poolSymbol,
@@ -123,7 +114,6 @@ contract DeployEdenCoreScript is Script {
         address firstPool = edenCore.createPool(poolParams);
         console.log("First Pool (Nigerian Money Market) created at:", firstPool);
 
-        // 11. Authorize pool in NFT Manager
         nftManager.authorizePool(firstPool, true);
 
         vm.stopBroadcast();

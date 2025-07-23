@@ -3,7 +3,6 @@
 pragma solidity ^0.8.22;
 
 import "forge-std/console.sol";
-
 import "./EdenVestTestBase.sol";
 import "../src/vest/interfaces/IInvestmentPool.sol";
 
@@ -30,37 +29,222 @@ contract EdenCoreTest is EdenVestTestBase {
 
     function test_Initialize_Success() public {
         EdenCore newCore = new EdenCore();
-        newCore.initialize(address(cNGN), treasury, admin, 250);
+        newCore.initialize(address(cNGN), treasury, admin, 250, multisigSigners);
 
         assertEq(newCore.cNGN(), address(cNGN), "cNGN not set");
         assertEq(newCore.protocolTreasury(), treasury, "Treasury not set");
         assertEq(newCore.globalTaxRate(), 250, "Tax rate not set");
         assertTrue(newCore.hasRole(newCore.ADMIN_ROLE(), admin), "Admin role not granted");
+
+        // Check multisig signers
+        address[] memory signers = newCore.getMultisigSigners();
+        assertEq(signers.length, 3, "Incorrect number of multisig signers");
+        assertTrue(newCore.isMultisigSigner(multisigSigners[0]), "Signer 0 not set");
+        assertTrue(newCore.isMultisigSigner(multisigSigners[1]), "Signer 1 not set");
+        assertTrue(newCore.isMultisigSigner(multisigSigners[2]), "Signer 2 not set");
     }
 
     function test_RevertWhen_InitializeWithZeroAddress() public {
         EdenCore newCore = new EdenCore();
 
         vm.expectRevert(EdenCore.InvalidAddress.selector);
-        newCore.initialize(address(0), treasury, admin, 250);
+        newCore.initialize(address(0), treasury, admin, 250, multisigSigners);
 
         vm.expectRevert(EdenCore.InvalidAddress.selector);
-        newCore.initialize(address(cNGN), address(0), admin, 250);
+        newCore.initialize(address(cNGN), address(0), admin, 250, multisigSigners);
     }
 
     function test_RevertWhen_InitializeWithHighTaxRate() public {
         EdenCore newCore = new EdenCore();
 
         vm.expectRevert(EdenCore.InvalidTaxRate.selector);
-        newCore.initialize(address(cNGN), treasury, admin, 1001); // > 10%
+        newCore.initialize(address(cNGN), treasury, admin, 1001, multisigSigners); // > 10%
+    }
+
+    function test_RevertWhen_InitializeWithInsufficientSigners() public {
+        EdenCore newCore = new EdenCore();
+        address[] memory insufficientSigners = new address[](2);
+        insufficientSigners[0] = address(0x10);
+        insufficientSigners[1] = address(0x11);
+
+        vm.expectRevert(EdenCore.InvalidSignerCount.selector);
+        newCore.initialize(address(cNGN), treasury, admin, 250, insufficientSigners);
     }
 
     function test_AdminHasRole() public {
         EdenCore newCore = new EdenCore();
-        newCore.initialize(address(cNGN), treasury, admin, 250);
+        newCore.initialize(address(cNGN), treasury, admin, 250, multisigSigners);
 
         assertTrue(newCore.hasRole(newCore.EMERGENCY_ROLE(), admin), "Emergency role not granted");
         assertTrue(newCore.hasRole(newCore.POOL_CREATOR_ROLE(), admin), "Pool creator role not granted");
+    }
+
+    // ============ Multisig Tests ============
+
+    function test_CreateProposal_PauseProtocol() public {
+        vm.prank(multisigSigners[0]);
+        uint256 proposalId = edenCore.proposePauseProtocol("Security issue detected");
+
+        (uint256 id, EdenCore.ProposalType proposalType, address proposer,,, bool executed, uint256 signatureCount,,) =
+            edenCore.proposals(proposalId);
+
+        assertEq(id, proposalId, "Proposal ID mismatch");
+        assertTrue(uint256(proposalType) == 0, "Proposal type should be PAUSE_PROTOCOL");
+        assertEq(proposer, multisigSigners[0], "Proposer mismatch");
+        assertEq(signatureCount, 1, "Should have 1 signature from proposer");
+        assertFalse(executed, "Should not be executed yet");
+
+        assertTrue(edenCore.hasSignedProposalView(proposalId, multisigSigners[0]), "Proposer should have signed");
+    }
+
+    function test_SignAndExecuteProposal_PauseProtocol() public {
+        // Create proposal
+        vm.prank(multisigSigners[0]);
+        uint256 proposalId = edenCore.proposePauseProtocol("Security issue");
+
+        // Sign by second signer
+        vm.prank(multisigSigners[1]);
+        edenCore.signProposal(proposalId);
+
+        // Check signature count
+        assertEq(edenCore.getProposalSignatureCount(proposalId), 2, "Should have 2 signatures");
+
+        // Sign by third signer - should auto-execute
+        vm.prank(multisigSigners[2]);
+        edenCore.signProposal(proposalId);
+
+        // Check that protocol is paused
+        assertTrue(edenCore.paused(), "Protocol should be paused");
+
+        // Check proposal is executed
+        (,,,,, bool executed,,,) = edenCore.proposals(proposalId);
+        assertTrue(executed, "Proposal should be executed");
+    }
+
+    function test_SetGlobalTaxRate_ViaMultisig() public {
+        uint256 newRate = 500; // 5%
+
+        // Create proposal
+        vm.prank(multisigSigners[0]);
+        uint256 proposalId = edenCore.proposeSetGlobalTaxRate(newRate, "Adjust for market conditions");
+
+        // Sign by other signers
+        vm.prank(multisigSigners[1]);
+        edenCore.signProposal(proposalId);
+
+        vm.prank(multisigSigners[2]);
+        edenCore.signProposal(proposalId);
+
+        // Check tax rate updated
+        assertEq(edenCore.globalTaxRate(), newRate, "Global tax rate not updated");
+    }
+
+    function test_EmergencyWithdraw_ViaMultisig() public {
+        // Send some tokens to EdenCore
+        cNGN.mint(address(edenCore), 10000e18);
+
+        uint256 withdrawAmount = 5000e18;
+        uint256 balanceBefore = cNGN.balanceOf(treasury);
+
+        // Create proposal
+        vm.prank(multisigSigners[0]);
+        uint256 proposalId = edenCore.proposeEmergencyWithdraw(address(cNGN), withdrawAmount, "Emergency fund recovery");
+
+        // Sign by other signers
+        vm.prank(multisigSigners[1]);
+        edenCore.signProposal(proposalId);
+
+        vm.prank(multisigSigners[2]);
+        edenCore.signProposal(proposalId);
+
+        // Check withdrawal succeeded
+        uint256 balanceAfter = cNGN.balanceOf(treasury);
+        assertEq(balanceAfter - balanceBefore, withdrawAmount, "Emergency withdrawal failed");
+    }
+
+    function test_RevertWhen_NonSignerCreatesProposal() public {
+        vm.prank(user1);
+        vm.expectRevert(EdenCore.NotMultisigSigner.selector);
+        edenCore.proposePauseProtocol("Not a signer");
+    }
+
+    function test_RevertWhen_SigningTwice() public {
+        vm.prank(multisigSigners[0]);
+        uint256 proposalId = edenCore.proposePauseProtocol("Test");
+
+        vm.prank(multisigSigners[0]);
+        vm.expectRevert(EdenCore.AlreadySigned.selector);
+        edenCore.signProposal(proposalId);
+    }
+
+    function test_RevertWhen_ExecutingWithInsufficientSignatures() public {
+        vm.prank(multisigSigners[0]);
+        uint256 proposalId = edenCore.proposePauseProtocol("Test");
+
+        vm.prank(multisigSigners[1]);
+        vm.expectRevert(EdenCore.InsufficientSignatures.selector);
+        edenCore.executeProposal(proposalId);
+    }
+
+    function test_ProposalExpiry() public {
+        vm.prank(multisigSigners[0]);
+        uint256 proposalId = edenCore.proposePauseProtocol("Test");
+
+        // Warp past expiry
+        vm.warp(block.timestamp + 4 days);
+
+        vm.prank(multisigSigners[1]);
+        vm.expectRevert(EdenCore.EProposalExpired.selector);
+        edenCore.signProposal(proposalId);
+    }
+
+    function test_AddMultisigSigner() public {
+        address newSigner = address(0x999);
+
+        // Create proposal
+        vm.prank(multisigSigners[0]);
+        uint256 proposalId = edenCore.proposeAddMultisigSigner(newSigner, "Adding new team member");
+
+        // Sign by other signers
+        vm.prank(multisigSigners[1]);
+        edenCore.signProposal(proposalId);
+
+        vm.prank(multisigSigners[2]);
+        edenCore.signProposal(proposalId);
+
+        // Check new signer added
+        assertTrue(edenCore.isMultisigSigner(newSigner), "New signer not added");
+        address[] memory signers = edenCore.getMultisigSigners();
+        assertEq(signers.length, 4, "Signer count should be 4");
+    }
+
+    function test_RemoveMultisigSigner() public {
+        // First add a new signer so we can remove one safely
+        address newSigner = address(0x999);
+
+        vm.prank(multisigSigners[0]);
+        uint256 addProposalId = edenCore.proposeAddMultisigSigner(newSigner, "Adding for removal test");
+
+        vm.prank(multisigSigners[1]);
+        edenCore.signProposal(addProposalId);
+
+        vm.prank(multisigSigners[2]);
+        edenCore.signProposal(addProposalId);
+
+        // Now remove the original signer
+        vm.prank(multisigSigners[0]);
+        uint256 removeProposalId = edenCore.proposeRemoveMultisigSigner(multisigSigners[2], "Removing inactive member");
+
+        vm.prank(multisigSigners[1]);
+        edenCore.signProposal(removeProposalId);
+
+        vm.prank(newSigner);
+        edenCore.signProposal(removeProposalId);
+
+        // Check signer removed
+        assertFalse(edenCore.isMultisigSigner(multisigSigners[2]), "Signer not removed");
+        address[] memory signers = edenCore.getMultisigSigners();
+        assertEq(signers.length, 3, "Signer count should be back to 3");
     }
 
     // ============ Pool Creation Tests ============
@@ -71,9 +255,9 @@ contract EdenCoreTest is EdenVestTestBase {
 
         assertTrue(edenCore.isRegisteredPool(newPool), "Pool not registered");
 
-        (string memory name, address admin,,, bool isActive) = edenCore.poolInfo(newPool);
+        (string memory name, address poolAdmin,,, bool isActive) = edenCore.poolInfo(newPool);
         assertEq(name, "Test Pool", "Pool name mismatch");
-        assertEq(admin, admin, "Pool admin mismatch");
+        assertEq(poolAdmin, admin, "Pool admin mismatch");
         assertTrue(isActive, "Pool not active");
 
         uint256 poolCount = edenCore.getAllPools().length;
@@ -138,8 +322,15 @@ contract EdenCoreTest is EdenVestTestBase {
     }
 
     function test_RevertWhen_InvestWhilePaused() public {
-        vm.prank(admin);
-        edenCore.pause();
+        // Pause protocol via multisig
+        vm.prank(multisigSigners[0]);
+        uint256 proposalId = edenCore.proposePauseProtocol("Testing pause");
+
+        vm.prank(multisigSigners[1]);
+        edenCore.signProposal(proposalId);
+
+        vm.prank(multisigSigners[2]);
+        edenCore.signProposal(proposalId);
 
         vm.startPrank(user1);
         cNGN.approve(address(edenCore), 10000e18);
@@ -162,7 +353,6 @@ contract EdenCoreTest is EdenVestTestBase {
 
         // Transfer funds back to pool for withdrawal
         vm.prank(multisig);
-
         cNGN.transfer(pool, investAmount + 1500e18); // principal + 15% returns
 
         // Warp time to maturity
@@ -190,46 +380,9 @@ contract EdenCoreTest is EdenVestTestBase {
         edenCore.invest(pool, investAmount, "Test Investment");
         vm.stopPrank();
 
-        // Check tax collected
         uint256 expectedTax = investAmount * 250 / 10000; // 2.5%
+
         assertEq(taxCollector.tokenTaxBalance(lpToken), expectedTax, "Tax not collected correctly");
-    }
-
-    // ============ Admin Function Tests ============
-
-    function test_SetGlobalTaxRate_Success() public {
-        vm.prank(admin);
-        edenCore.setGlobalTaxRate(500); // 5%
-
-        assertEq(edenCore.globalTaxRate(), 500, "Tax rate not updated");
-    }
-
-    function test_RevertWhen_SetTaxRateTooHigh() public {
-        vm.prank(admin);
-        vm.expectRevert(EdenCore.InvalidTaxRate.selector);
-        edenCore.setGlobalTaxRate(1001); // > 10%
-    }
-
-    function test_SetProtocolTreasury_Success() public {
-        address newTreasury = address(0x999);
-
-        vm.prank(admin);
-        edenCore.setProtocolTreasury(newTreasury);
-
-        assertEq(edenCore.protocolTreasury(), newTreasury, "Treasury not updated");
-    }
-
-    function test_EmergencyWithdraw_Success() public {
-        // Send some tokens to EdenCore
-        cNGN.mint(address(edenCore), 10000e18);
-
-        uint256 balanceBefore = cNGN.balanceOf(treasury);
-
-        vm.prank(admin);
-        edenCore.emergencyWithdraw(address(cNGN), 10000e18);
-
-        uint256 balanceAfter = cNGN.balanceOf(treasury);
-        assertEq(balanceAfter - balanceBefore, 10000e18, "Emergency withdrawal failed");
     }
 
     // ============ View Function Tests ============
@@ -252,5 +405,76 @@ contract EdenCoreTest is EdenVestTestBase {
         address[] memory activePools = edenCore.getActivePools();
         assertEq(activePools.length, 1, "Active pool count mismatch");
         assertEq(activePools[0], pool2, "Active pool address mismatch");
+    }
+
+    function test_GetProposal() public {
+        vm.prank(multisigSigners[0]);
+        uint256 proposalId = edenCore.proposePauseProtocol("Test proposal");
+
+        EdenCore.Proposal memory proposal = edenCore.getProposal(proposalId);
+
+        assertEq(proposal.id, proposalId, "Proposal ID mismatch");
+        assertTrue(uint256(proposal.proposalType) == 0, "Proposal type mismatch");
+        assertEq(proposal.proposer, multisigSigners[0], "Proposer mismatch");
+        assertEq(proposal.signatureCount, 1, "Signature count mismatch");
+        assertTrue(
+            keccak256(abi.encodePacked(proposal.description))
+                == keccak256(abi.encodePacked("Pause Protocol: Test proposal")),
+            "Description mismatch"
+        );
+    }
+
+    function test_GetMultisigSigners() public view {
+        address[] memory signers = edenCore.getMultisigSigners();
+        assertEq(signers.length, 3, "Signer count mismatch");
+        assertEq(signers[0], multisigSigners[0], "Signer 0 mismatch");
+        assertEq(signers[1], multisigSigners[1], "Signer 1 mismatch");
+        assertEq(signers[2], multisigSigners[2], "Signer 2 mismatch");
+    }
+
+    // ============ Admin Function Tests (Non-Critical) ============
+
+    function test_SetPoolFactory_Success() public {
+        address newFactory = address(0x999);
+
+        vm.prank(admin);
+        edenCore.setPoolFactory(newFactory);
+
+        assertEq(address(edenCore.poolFactory()), newFactory, "Pool factory not updated");
+    }
+
+    function test_SetTaxCollector_Success() public {
+        address newCollector = address(0x999);
+
+        vm.prank(admin);
+        edenCore.setTaxCollector(newCollector);
+
+        assertEq(address(edenCore.taxCollector()), newCollector, "Tax collector not updated");
+    }
+
+    function test_SetSwapRouter_Success() public {
+        address newRouter = address(0x999);
+
+        vm.prank(admin);
+        edenCore.setSwapRouter(newRouter);
+
+        assertEq(address(edenCore.swapRouter()), newRouter, "Swap router not updated");
+    }
+
+    function test_SetNFTManager_Success() public {
+        address newManager = address(0x999);
+
+        vm.prank(admin);
+        edenCore.setNFTManager(newManager);
+
+        assertEq(address(edenCore.nftManager()), newManager, "NFT manager not updated");
+    }
+
+    function test_SetPoolActive_Success() public {
+        vm.prank(admin);
+        edenCore.setPoolActive(pool, false);
+
+        (,,,, bool isActive) = edenCore.poolInfo(pool);
+        assertFalse(isActive, "Pool should be inactive");
     }
 }

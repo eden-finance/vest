@@ -30,6 +30,7 @@ This audit focuses on the EdenCore contract, which serves as the main entry poin
 ## Detailed Findings
 
 ### [EC-01] Insufficient validation in `investWithSwap` function
+
 **Severity**: High
 
 **Description**:  

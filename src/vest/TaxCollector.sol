@@ -14,6 +14,8 @@ contract TaxCollector is ITaxCollector, Ownable {
     using SafeERC20 for IERC20;
 
     address public treasury;
+    address public edenCore;
+
     mapping(address => uint256) public poolTaxCollected;
     mapping(address => uint256) public tokenTaxBalance;
 
@@ -21,9 +23,18 @@ contract TaxCollector is ITaxCollector, Ownable {
     event TaxWithdrawn(address indexed token, uint256 amount, address indexed to);
     event TreasuryUpdated(address oldTreasury, address newTreasury);
 
-    constructor(address _treasury, address _owner) Ownable(_owner) {
+    constructor(address _treasury, address _owner, address _edenCore) Ownable(_owner) {
         require(_treasury != address(0), "Invalid treasury");
         treasury = _treasury;
+        edenCore = _edenCore;
+    }
+
+    error NotEdenCore();
+
+    // ============ MODIFIERS ============
+    modifier onlyEdenCore() {
+        if (msg.sender != edenCore) revert NotEdenCore();
+        _;
     }
 
     function withdrawTax(address token) external onlyOwner {
@@ -49,5 +60,10 @@ contract TaxCollector is ITaxCollector, Ownable {
 
     function getTokenTaxBalance(address token) external view returns (uint256) {
         return tokenTaxBalance[token];
+    }
+
+    function collectTax(address token, address pool, uint256 amount) external onlyEdenCore {
+        tokenTaxBalance[token] += amount;
+        emit TaxCollected(token, amount, pool);
     }
 }

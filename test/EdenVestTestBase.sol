@@ -2,7 +2,7 @@
 pragma solidity ^0.8.22;
 
 import "forge-std/Test.sol";
-import "../src/vest/EdenCore.sol";
+import "../src/vest/EdenVestCore.sol";
 import "../src/vest/InvestmentPool.sol";
 import "../src/vest/PoolFactory.sol";
 import "../src/vest/LPToken.sol";
@@ -15,7 +15,7 @@ import "./mocks/MockERC20.sol";
 
 // Mock contracts for testing
 contract MockcNGN is MockERC20 {
-    constructor() MockERC20("Mock cNGN", "McN", 18) {
+    constructor() MockERC20("Mock cNGN", "McNGN", 18) {
         _mint(msg.sender, 1000000e18);
     }
 }
@@ -59,7 +59,6 @@ contract EdenVestTestBase is Test {
         nftRenderer = new EdenPoolNFT();
         nftManager = new NFTPositionManager(address(nftRenderer), admin);
         poolFactory = new PoolFactory(admin);
-        taxCollector = new TaxCollector(treasury, admin);
 
         // Mock Uniswap contracts for testing
         address mockUniswapRouter = address(0x100);
@@ -68,7 +67,8 @@ contract EdenVestTestBase is Test {
 
         // Deploy and initialize EdenCore
         edenCore = new EdenCore();
-        edenCore.initialize(address(cNGN), treasury, admin, 250); // 2.5% tax
+        edenCore.initialize(address(cNGN), treasury, admin, 250, multisigSigners); // 2.5% tax
+        taxCollector = new TaxCollector(treasury, admin, address(edenCore));
 
         // Setup EdenCore dependencies
         vm.startPrank(admin);
@@ -91,8 +91,8 @@ contract EdenVestTestBase is Test {
             poolMultisig: multisig,
             multisigSigners: multisigSigners,
             lockDuration: 30 days,
-            minInvestment: 1000e18,
-            maxInvestment: 1000000e18,
+            minInvestment: 1_000e18,
+            maxInvestment: 10_000_000e18,
             utilizationCap: 10000000e18,
             expectedRate: 1500, // 15% APY
             taxRate: 0, // Use global rate
