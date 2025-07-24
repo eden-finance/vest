@@ -286,7 +286,7 @@ contract EdenCoreTest is EdenVestTestBase {
         vm.startPrank(user1);
         cNGN.approve(address(edenCore), investAmount);
 
-        (uint256 tokenId, uint256 lpTokens) = edenCore.invest(pool, investAmount, "Test Investment");
+        (uint256 tokenId, uint256 lpTokens) = edenCore.invest(pool, investAmount, "Test Investment",0);
         vm.stopPrank();
 
         assertTrue(tokenId > 0, "Invalid token ID");
@@ -304,7 +304,7 @@ contract EdenCoreTest is EdenVestTestBase {
         cNGN.approve(address(edenCore), 10000e18);
 
         vm.expectRevert(EdenCore.InvalidPool.selector);
-        edenCore.invest(address(0x999), 10000e18, "Test");
+        edenCore.invest(address(0x999), 10000e18, "Test",0);
         vm.stopPrank();
     }
 
@@ -317,7 +317,7 @@ contract EdenCoreTest is EdenVestTestBase {
         cNGN.approve(address(edenCore), 10000e18);
 
         vm.expectRevert(EdenCore.PoolNotActive.selector);
-        edenCore.invest(pool, 10000e18, "Test");
+        edenCore.invest(pool, 10000e18, "Test",0);
         vm.stopPrank();
     }
 
@@ -336,7 +336,7 @@ contract EdenCoreTest is EdenVestTestBase {
         cNGN.approve(address(edenCore), 10000e18);
 
         vm.expectRevert("EnforcedPause()");
-        edenCore.invest(pool, 10000e18, "Test");
+        edenCore.invest(pool, 10000e18, "Test",0);
         vm.stopPrank();
     }
 
@@ -348,7 +348,7 @@ contract EdenCoreTest is EdenVestTestBase {
 
         vm.startPrank(user1);
         cNGN.approve(address(edenCore), investAmount);
-        (uint256 tokenId, uint256 lpTokens) = edenCore.invest(pool, investAmount, "Test Investment");
+        (uint256 tokenId, uint256 lpTokens) = edenCore.invest(pool, investAmount, "Test Investment",0);
         vm.stopPrank();
 
         // Transfer funds back to pool for withdrawal
@@ -377,7 +377,7 @@ contract EdenCoreTest is EdenVestTestBase {
 
         vm.startPrank(user1);
         cNGN.approve(address(edenCore), investAmount);
-        edenCore.invest(pool, investAmount, "Test Investment");
+        edenCore.invest(pool, investAmount, "Test Investment",0);
         vm.stopPrank();
 
         uint256 expectedTax = investAmount * 250 / 10000; // 2.5%
