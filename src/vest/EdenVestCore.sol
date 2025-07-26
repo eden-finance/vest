@@ -424,8 +424,6 @@ contract EdenCore is
         emit MultisigSignerRemoved(signerToRemove);
     }
 
-    // ============ POOL MANAGEMENT ============ (Keep existing functions unchanged)
-
     function createPool(IPoolFactory.PoolParams memory poolParams)
         external
         onlyRole(POOL_CREATOR_ROLE)
@@ -456,11 +454,10 @@ contract EdenCore is
         emit PoolCreated(pool, poolParams.name, poolParams.admin, poolInfo[pool].lpToken);
     }
 
-    function invest(address pool, uint256 amount, string memory title,uint256 deadline)
+    function invest(address pool, uint256 amount, string memory title, uint256 deadline)
         external
         whenNotPaused
         nonReentrant
-        
         returns (uint256 tokenId, uint256 lpTokens)
     {
         if (!isRegisteredPool[pool]) revert InvalidPool();

@@ -43,7 +43,6 @@ contract InvestmentPool is
     address public poolMultisig;
     address public nftManager;
     address public edenCore;
-    address public taxCollector;
 
     PoolConfig public poolConfig;
     uint256 public totalDeposited;
@@ -71,12 +70,27 @@ contract InvestmentPool is
         __ReentrancyGuard_init();
         __Pausable_init();
 
+        require(params.lpToken != address(0), "Invalid LP token");
+        require(params.cNGN != address(0), "Invalid cNGN");
+        require(params.poolMultisig != address(0), "Invalid multisig");
+        require(params.nftManager != address(0), "Invalid NFT manager");
+        require(params.edenCore != address(0), "Invalid Eden Core");
+        require(params.admin != address(0), "Invalid admin");
+
+        // Validate configuration
+        require(params.lockDuration >= MIN_LOCK_DURATION, "Lock duration too short");
+        require(params.lockDuration <= MAX_LOCK_DURATION, "Lock duration too long");
+        require(params.minInvestment > 0, "Invalid min investment");
+        require(params.maxInvestment >= params.minInvestment, "Invalid max investment");
+        require(params.expectedRate <= 10000, "Expected rate too high"); // Max 100% APY
+        require(params.taxRate <= 1000, "Tax rate too high"); // Max 10%
+        require(bytes(params.name).length > 0, "Invalid name");
+
         lpToken = params.lpToken;
         cNGN = params.cNGN;
         poolMultisig = params.poolMultisig;
         nftManager = params.nftManager;
         edenCore = params.edenCore;
-        taxCollector = params.taxCollector;
 
         poolConfig = PoolConfig({
             name: params.name,
@@ -127,7 +141,7 @@ contract InvestmentPool is
 
         uint256 investmentId = nextInvestmentId++;
         uint256 maturityTime = block.timestamp + poolConfig.lockDuration;
-        uint256 expectedReturn = _calculateExpectedReturn(amount);
+        uint256 expectedInterest = _calculateExpectedReturn(amount);
 
         // Mint LP tokens
         uint256 totalLPTokens = _calculateLPTokens(amount);
@@ -139,6 +153,9 @@ contract InvestmentPool is
 
         taxAmount = (totalLPTokens * effectiveTaxRate) / BASIS_POINTS;
         userLPTokens = totalLPTokens - taxAmount;
+        address taxCollector = edenCore_.taxCollector();
+
+        uint256 expectedReturn = expectedInterest + amount;
 
         investments[investmentId] = Investment({
             investor: investor,
@@ -156,7 +173,6 @@ contract InvestmentPool is
         ILPToken(lpToken).mint(investor, userLPTokens);
         ILPToken(lpToken).mint(taxCollector, taxAmount);
 
-        // Mint NFT
         tokenId =
             INFTPositionManager(nftManager).mintPosition(investor, address(this), investmentId, amount, maturityTime);
 
@@ -165,7 +181,9 @@ contract InvestmentPool is
         // Transfer funds to multisig
         IERC20(cNGN).safeTransferFrom(edenCore, poolMultisig, amount);
 
-        emit InvestmentCreated(investmentId, investor, amount, totalLPTokens, tokenId);
+        emit InvestmentCreated(
+            investmentId, investor, amount, userLPTokens, tokenId, expectedReturn, maturityTime, title
+        );
     }
 
     /**
@@ -196,18 +214,17 @@ contract InvestmentPool is
         investment.isWithdrawn = true;
 
         withdrawAmount += investment.expectedReturn;
-        totalWithdrawn += withdrawAmount;
 
-        // Burn LP tokens
+        IERC20(lpToken).safeTransferFrom(investor, address(this), investment.lpTokens);
+
+        require(IERC20(lpToken).balanceOf(address(this)) >= requiredLPTokens, "LP tokens not received");
+
         ILPToken(lpToken).burn(address(this), requiredLPTokens);
 
-        // Burn NFT
         INFTPositionManager(nftManager).burnPosition(tokenId);
 
-        // Check pool has sufficient balance
         require(IERC20(cNGN).balanceOf(address(this)) >= withdrawAmount, "Insufficient pool balance");
 
-        // Transfer funds from pool to investor
         IERC20(cNGN).safeTransfer(investment.investor, withdrawAmount);
 
         emit InvestmentWithdrawn(investmentId, investor, withdrawAmount);
@@ -244,7 +261,12 @@ contract InvestmentPool is
      * @param accepting Whether to accept deposits
      */
     function setAcceptingDeposits(bool accepting) external onlyRole(POOL_ADMIN_ROLE) {
+        bool oldState = poolConfig.acceptingDeposits;
         poolConfig.acceptingDeposits = accepting;
+
+        if (oldState != accepting) {
+            emit DepositsToggled(accepting, msg.sender);
+        }
     }
 
     /**
@@ -294,8 +316,14 @@ contract InvestmentPool is
     {
         deposited = totalDeposited;
         withdrawn = totalWithdrawn;
-        available = poolConfig.utilizationCap > 0 ? poolConfig.utilizationCap - totalDeposited : type(uint256).max;
-        utilization = totalDeposited > 0 ? (totalDeposited * BASIS_POINTS) / poolConfig.utilizationCap : 0;
+
+        if (poolConfig.utilizationCap > 0) {
+            available = poolConfig.utilizationCap - totalDeposited;
+            utilization = (totalDeposited * BASIS_POINTS) / poolConfig.utilizationCap;
+        } else {
+            available = type(uint256).max;
+            utilization = 0;
+        }
     }
 
     /**
@@ -332,10 +360,12 @@ contract InvestmentPool is
         uint256 totalSupply = IERC20(lpToken).totalSupply();
 
         if (totalSupply == 0) {
-            // First deposit
             return amount;
         } else {
-            // Proportional to pool share
+            if (totalDeposited == 0) {
+                return amount;
+            }
+
             return (amount * totalSupply) / totalDeposited;
         }
     }

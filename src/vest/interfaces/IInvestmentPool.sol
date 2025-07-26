@@ -10,7 +10,6 @@ interface IInvestmentPool {
         address nftManager;
         address edenCore;
         address admin;
-        address taxCollector;
         address[] multisigSigners;
         uint256 lockDuration;
         uint256 minInvestment;
@@ -43,8 +42,17 @@ interface IInvestmentPool {
     }
 
     event InvestmentCreated(
-        uint256 indexed investmentId, address indexed investor, uint256 amount, uint256 lpAmount, uint256 tokenId
+        uint256 indexed investmentId,
+        address indexed investor,
+        uint256 amount,
+        uint256 lpTokens,
+        uint256 indexed tokenId,
+        uint256 expectedReturn,
+        uint256 maturityTime,
+        string title
     );
+    event DepositsToggled(bool accepting, address indexed admin);
+
     event InvestmentWithdrawn(uint256 indexed investmentId, address indexed investor, uint256 amount);
     event InvestmentMatured(uint256 indexed investmentId, uint256 actualReturn);
     event PoolConfigUpdated(PoolConfig config);

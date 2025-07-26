@@ -107,8 +107,7 @@ contract DeployEdenCoreScript is Script {
             maxInvestment: config.maxInvestment,
             utilizationCap: config.utilizationCap,
             expectedRate: config.expectedRate,
-            taxRate: config.poolTaxRate,
-            taxCollector: address(taxCollector)
+            taxRate: config.poolTaxRate
         });
 
         address firstPool = edenCore.createPool(poolParams);

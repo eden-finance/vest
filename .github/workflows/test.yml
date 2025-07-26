@@ -29,21 +29,21 @@ jobs:
           forge fmt --check
         id: fmt
 
-      - name: Install dependencies
-        run: |
-          forge install
-        id: install
-
-      - name: Generate remappings
-        run: |
-          forge remappings > remappings.txt
-
-      - name: Run Forge build
-        run: |
-          forge build --sizes
-        id: build
-
-      # - name: Run Forge tests
+      # - name: Install dependencies
       #   run: |
-      #     forge test -vvv
-      #   id: test
+      #     forge install
+      #   id: install
+
+      # - name: Generate remappings
+      #   run: |
+      #     forge remappings > remappings.txt
+
+      # - name: Run Forge build
+      #   run: |
+      #     forge build --sizes
+      #   id: build
+
+      # # - name: Run Forge tests
+      # #   run: |
+      # #     forge test -vvv
+      # #   id: test

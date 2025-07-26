@@ -81,7 +81,6 @@ contract PoolFactory is IPoolFactory, Ownable {
             lockDuration: params.lockDuration,
             minInvestment: params.minInvestment,
             maxInvestment: params.maxInvestment,
-            taxCollector: params.taxCollector,
             utilizationCap: params.utilizationCap,
             expectedRate: params.expectedRate,
             taxRate: params.taxRate

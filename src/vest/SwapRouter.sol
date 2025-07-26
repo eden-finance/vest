@@ -6,7 +6,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interfaces/ISwapRouter.sol" as IEdenSwapRouter;
 
-// Uniswap V3 Interface definitions
 interface IUniswapV3SwapRouter {
     struct ExactInputSingleParams {
         address tokenIn;

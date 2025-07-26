@@ -20,7 +20,6 @@ contract EdenCoreTest is EdenVestTestBase {
 
         lpToken = _lpToken;
 
-        // Authorize pool in NFT manager
         vm.prank(admin);
         nftManager.authorizePool(pool, true);
     }
@@ -36,7 +35,6 @@ contract EdenCoreTest is EdenVestTestBase {
         assertEq(newCore.globalTaxRate(), 250, "Tax rate not set");
         assertTrue(newCore.hasRole(newCore.ADMIN_ROLE(), admin), "Admin role not granted");
 
-        // Check multisig signers
         address[] memory signers = newCore.getMultisigSigners();
         assertEq(signers.length, 3, "Incorrect number of multisig signers");
         assertTrue(newCore.isMultisigSigner(multisigSigners[0]), "Signer 0 not set");
@@ -190,7 +188,6 @@ contract EdenCoreTest is EdenVestTestBase {
         vm.prank(multisigSigners[0]);
         uint256 proposalId = edenCore.proposePauseProtocol("Test");
 
-        // Warp past expiry
         vm.warp(block.timestamp + 4 days);
 
         vm.prank(multisigSigners[1]);
@@ -201,25 +198,21 @@ contract EdenCoreTest is EdenVestTestBase {
     function test_AddMultisigSigner() public {
         address newSigner = address(0x999);
 
-        // Create proposal
         vm.prank(multisigSigners[0]);
         uint256 proposalId = edenCore.proposeAddMultisigSigner(newSigner, "Adding new team member");
 
-        // Sign by other signers
         vm.prank(multisigSigners[1]);
         edenCore.signProposal(proposalId);
 
         vm.prank(multisigSigners[2]);
         edenCore.signProposal(proposalId);
 
-        // Check new signer added
         assertTrue(edenCore.isMultisigSigner(newSigner), "New signer not added");
         address[] memory signers = edenCore.getMultisigSigners();
         assertEq(signers.length, 4, "Signer count should be 4");
     }
 
     function test_RemoveMultisigSigner() public {
-        // First add a new signer so we can remove one safely
         address newSigner = address(0x999);
 
         vm.prank(multisigSigners[0]);
@@ -231,7 +224,6 @@ contract EdenCoreTest is EdenVestTestBase {
         vm.prank(multisigSigners[2]);
         edenCore.signProposal(addProposalId);
 
-        // Now remove the original signer
         vm.prank(multisigSigners[0]);
         uint256 removeProposalId = edenCore.proposeRemoveMultisigSigner(multisigSigners[2], "Removing inactive member");
 
@@ -241,7 +233,6 @@ contract EdenCoreTest is EdenVestTestBase {
         vm.prank(newSigner);
         edenCore.signProposal(removeProposalId);
 
-        // Check signer removed
         assertFalse(edenCore.isMultisigSigner(multisigSigners[2]), "Signer not removed");
         address[] memory signers = edenCore.getMultisigSigners();
         assertEq(signers.length, 3, "Signer count should be back to 3");
@@ -286,7 +277,7 @@ contract EdenCoreTest is EdenVestTestBase {
         vm.startPrank(user1);
         cNGN.approve(address(edenCore), investAmount);
 
-        (uint256 tokenId, uint256 lpTokens) = edenCore.invest(pool, investAmount, "Test Investment",0);
+        (uint256 tokenId, uint256 lpTokens) = edenCore.invest(pool, investAmount, "Test Investment", 0);
         vm.stopPrank();
 
         assertTrue(tokenId > 0, "Invalid token ID");
@@ -294,7 +285,6 @@ contract EdenCoreTest is EdenVestTestBase {
 
         uint256 taxRate = 250; //2.5%
 
-        // Check LP token balance (after tax)
         uint256 expectedLpTokens = investAmount - (investAmount * taxRate / 10000);
         assertEq(IERC20(lpToken).balanceOf(user1), expectedLpTokens, "LP token balance mismatch");
     }
@@ -304,12 +294,11 @@ contract EdenCoreTest is EdenVestTestBase {
         cNGN.approve(address(edenCore), 10000e18);
 
         vm.expectRevert(EdenCore.InvalidPool.selector);
-        edenCore.invest(address(0x999), 10000e18, "Test",0);
+        edenCore.invest(address(0x999), 10000e18, "Test", 0);
         vm.stopPrank();
     }
 
     function test_RevertWhen_InvestInInactivePool() public {
-        // Deactivate pool
         vm.prank(admin);
         edenCore.setPoolActive(pool, false);
 
@@ -317,12 +306,11 @@ contract EdenCoreTest is EdenVestTestBase {
         cNGN.approve(address(edenCore), 10000e18);
 
         vm.expectRevert(EdenCore.PoolNotActive.selector);
-        edenCore.invest(pool, 10000e18, "Test",0);
+        edenCore.invest(pool, 10000e18, "Test", 0);
         vm.stopPrank();
     }
 
     function test_RevertWhen_InvestWhilePaused() public {
-        // Pause protocol via multisig
         vm.prank(multisigSigners[0]);
         uint256 proposalId = edenCore.proposePauseProtocol("Testing pause");
 
@@ -336,7 +324,7 @@ contract EdenCoreTest is EdenVestTestBase {
         cNGN.approve(address(edenCore), 10000e18);
 
         vm.expectRevert("EnforcedPause()");
-        edenCore.invest(pool, 10000e18, "Test",0);
+        edenCore.invest(pool, 10000e18, "Test", 0);
         vm.stopPrank();
     }
 
@@ -348,17 +336,14 @@ contract EdenCoreTest is EdenVestTestBase {
 
         vm.startPrank(user1);
         cNGN.approve(address(edenCore), investAmount);
-        (uint256 tokenId, uint256 lpTokens) = edenCore.invest(pool, investAmount, "Test Investment",0);
+        (uint256 tokenId, uint256 lpTokens) = edenCore.invest(pool, investAmount, "Test Investment", 0);
         vm.stopPrank();
 
-        // Transfer funds back to pool for withdrawal
         vm.prank(multisig);
-        cNGN.transfer(pool, investAmount + 1500e18); // principal + 15% returns
+        cNGN.transfer(pool, investAmount + 1500e18);
 
-        // Warp time to maturity
         vm.warp(block.timestamp + 31 days);
 
-        // Withdraw
         vm.startPrank(user1);
         IERC20(lpToken).approve(address(edenCore), lpTokens);
 
@@ -377,7 +362,7 @@ contract EdenCoreTest is EdenVestTestBase {
 
         vm.startPrank(user1);
         cNGN.approve(address(edenCore), investAmount);
-        edenCore.invest(pool, investAmount, "Test Investment",0);
+        edenCore.invest(pool, investAmount, "Test Investment", 0);
         vm.stopPrank();
 
         uint256 expectedTax = investAmount * 250 / 10000; // 2.5%
@@ -394,11 +379,9 @@ contract EdenCoreTest is EdenVestTestBase {
     }
 
     function test_GetActivePools() public {
-        // Create another pool
         vm.prank(admin);
         address pool2 = edenCore.createPool(defaultPoolParams);
 
-        // Deactivate first pool
         vm.prank(admin);
         edenCore.setPoolActive(pool, false);
 
@@ -431,8 +414,6 @@ contract EdenCoreTest is EdenVestTestBase {
         assertEq(signers[1], multisigSigners[1], "Signer 1 mismatch");
         assertEq(signers[2], multisigSigners[2], "Signer 2 mismatch");
     }
-
-    // ============ Admin Function Tests (Non-Critical) ============
 
     function test_SetPoolFactory_Success() public {
         address newFactory = address(0x999);

@@ -12,6 +12,7 @@ import "./EdenVestCore.sol";
 contract AdminInterface is AccessControl {
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
+    uint256 public constant MAX_POOLS_PER_QUERY = 50;
 
     EdenCore public edenCore;
 
@@ -36,11 +37,33 @@ contract AdminInterface is AccessControl {
     event PoolUnpaused(address indexed pool);
     event EmergencyAction(string action, address indexed target, uint256 value);
 
+    error InvalidEdenCore(address core);
+    error PoolNotRegistered(address pool);
+    error InvalidAdmin(address provided);
+
+    modifier validPool(address pool) {
+        if (pool == address(0)) revert PoolNotRegistered(pool);
+        if (!edenCore.isRegisteredPool(pool)) revert PoolNotRegistered(pool);
+        _;
+    }
+
     constructor(address _edenCore, address _admin) {
-        edenCore = EdenCore(_edenCore);
+        if (_edenCore == address(0)) revert InvalidEdenCore(_edenCore);
+        if (_admin == address(0)) revert InvalidAdmin(_admin);
+
+        if (_edenCore.code.length == 0) revert InvalidEdenCore(_edenCore);
+
+        try EdenCore(_edenCore).globalTaxRate() returns (uint256) {
+            edenCore = EdenCore(_edenCore);
+        } catch {
+            revert InvalidEdenCore(_edenCore);
+        }
+
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
         _grantRole(ADMIN_ROLE, _admin);
         _grantRole(OPERATOR_ROLE, _admin);
+
+        emit EmergencyAction("ADMIN_INTERFACE_DEPLOYED", _edenCore, 0);
     }
 
     // ============ VIEW FUNCTIONS ============
@@ -54,13 +77,23 @@ contract AdminInterface is AccessControl {
         uint256 activePools;
 
         for (uint256 i = 0; i < pools.length; i++) {
-            (uint256 deposited,,,) = IInvestmentPool(pools[i]).getPoolStats();
-            tvl += deposited;
+            address pool = pools[i];
 
-            (,,,, bool isActive) = edenCore.poolInfo(pools[i]);
+            // Safe external call with try-catch
+            try IInvestmentPool(pool).getPoolStats() returns (uint256 deposited, uint256, uint256, uint256) {
+                tvl += deposited;
+            } catch {
+                // Pool call failed - continue with next pool
+                continue;
+            }
 
-            if (isActive) {
-                activePools++;
+            try edenCore.poolInfo(pool) returns (string memory, address, address, uint256, bool isActive) {
+                if (isActive) {
+                    activePools++;
+                }
+            } catch {
+                // Pool info call failed - continue
+                continue;
             }
         }
 
@@ -75,108 +108,70 @@ contract AdminInterface is AccessControl {
     /**
      * @notice Get detailed pool statistics
      */
-    function getPoolStats(address pool) external view returns (PoolStats memory stats) {
+    function getPoolStats(address pool) external view validPool(pool) returns (PoolStats memory stats) {
         (string memory name,,,, bool isActive) = edenCore.poolInfo(pool);
 
-        (uint256 deposited, uint256 withdrawn,, uint256 utilization) = IInvestmentPool(pool).getPoolStats();
-
-        stats = PoolStats({
-            pool: pool,
-            name: name,
-            totalDeposited: deposited,
-            totalWithdrawn: withdrawn,
-            utilizationRate: utilization,
-            activeInvestments: deposited - withdrawn,
-            isActive: isActive
-        });
+        try IInvestmentPool(pool).getPoolStats() returns (
+            uint256 deposited, uint256 withdrawn, uint256, uint256 utilization
+        ) {
+            stats = PoolStats({
+                pool: pool,
+                name: name,
+                totalDeposited: deposited,
+                totalWithdrawn: withdrawn,
+                utilizationRate: utilization,
+                activeInvestments: deposited > withdrawn ? deposited - withdrawn : 0,
+                isActive: isActive
+            });
+        } catch {
+            // Return default stats if pool is unreachable
+            stats = PoolStats({
+                pool: pool,
+                name: name,
+                totalDeposited: 0,
+                totalWithdrawn: 0,
+                utilizationRate: 0,
+                activeInvestments: 0,
+                isActive: false
+            });
+        }
     }
 
     /**
      * @notice Get all pools with statistics
      */
-    function getAllPoolsWithStats() external view returns (PoolStats[] memory) {
+    function getAllPoolsWithStats(uint256 offset, uint256 limit)
+        external
+        view
+        returns (PoolStats[] memory stats, uint256 total)
+    {
         address[] memory pools = edenCore.getAllPools();
-        PoolStats[] memory allStats = new PoolStats[](pools.length);
+        total = pools.length;
 
-        for (uint256 i = 0; i < pools.length; i++) {
-            allStats[i] = this.getPoolStats(pools[i]);
-        }
+        if (limit > MAX_POOLS_PER_QUERY) limit = MAX_POOLS_PER_QUERY;
+        if (offset >= total) return (new PoolStats[](0), total);
 
-        return allStats;
-    }
+        uint256 end = offset + limit;
+        if (end > total) end = total;
 
-    // ============ POOL MANAGEMENT ============
+        stats = new PoolStats[](end - offset);
 
-    /**
-     * @notice Create a new pool with parameters
-     */
-    function createPool(IPoolFactory.PoolParams memory params) external onlyRole(ADMIN_ROLE) returns (address pool) {
-        pool = edenCore.createPool(params);
-        emit EmergencyAction("POOL_CREATED", pool, 0);
-    }
-
-    /**
-     * @notice Pause a specific pool
-     */
-    function pausePool(address pool) external onlyRole(OPERATOR_ROLE) {
-        IInvestmentPool(pool).pause();
-        emit PoolPaused(pool);
-    }
-
-    /**
-     * @notice Unpause a specific pool
-     */
-    function unpausePool(address pool) external onlyRole(OPERATOR_ROLE) {
-        IInvestmentPool(pool).unpause();
-        emit PoolUnpaused(pool);
-    }
-
-    /**
-     * @notice Update pool configuration
-     */
-    function updatePoolConfig(address pool, IInvestmentPool.PoolConfig memory config) external onlyRole(ADMIN_ROLE) {
-        IInvestmentPool(pool).updatePoolConfig(config);
-    }
-
-    /**
-     * @notice Toggle pool active status
-     */
-    function setPoolActive(address pool, bool active) external onlyRole(ADMIN_ROLE) {
-        edenCore.setPoolActive(pool, active);
-    }
-
-    // ============ PROTOCOL CONFIGURATION ============
-
-    /**
-     * @notice Update contract connections
-     */
-    function updateProtocolContracts(address poolFactory, address taxCollector, address swapRouter, address nftManager)
-        external
-        onlyRole(ADMIN_ROLE)
-    {
-        if (poolFactory != address(0)) edenCore.setPoolFactory(poolFactory);
-        if (taxCollector != address(0)) edenCore.setTaxCollector(taxCollector);
-        if (swapRouter != address(0)) edenCore.setSwapRouter(swapRouter);
-        if (nftManager != address(0)) edenCore.setNFTManager(nftManager);
-    }
-
-    // ============ EMERGENCY FUNCTIONS ============
-
-    /**
-     * @notice Batch update pool configurations
-     */
-    function batchUpdatePoolConfigs(address[] calldata pools, IInvestmentPool.PoolConfig[] calldata configs)
-        external
-        onlyRole(ADMIN_ROLE)
-    {
-        require(pools.length == configs.length, "Length mismatch");
-
-        for (uint256 i = 0; i < pools.length; i++) {
-            IInvestmentPool(pools[i]).updatePoolConfig(configs[i]);
+        for (uint256 i = offset; i < end; i++) {
+            try this.getPoolStats(pools[i]) returns (PoolStats memory poolStats) {
+                stats[i - offset] = poolStats;
+            } catch {
+                stats[i - offset] = PoolStats({
+                    pool: pools[i],
+                    name: "",
+                    totalDeposited: 0,
+                    totalWithdrawn: 0,
+                    utilizationRate: 0,
+                    activeInvestments: 0,
+                    isActive: false
+                });
+            }
         }
     }
-
-    // ============ MONITORING ============
 
     /**
      * @notice Check pool health
@@ -201,17 +196,35 @@ contract AdminInterface is AccessControl {
     /**
      * @notice Get pools requiring attention
      */
-    function getPoolsRequiringAttention() external view returns (address[] memory pools, string[] memory issues) {
+    function getPoolsRequiringAttention(uint256 maxPools)
+        external
+        view
+        returns (address[] memory pools, string[] memory issues)
+    {
         address[] memory allPools = edenCore.getAllPools();
-        address[] memory tempPools = new address[](allPools.length);
-        string[] memory tempIssues = new string[](allPools.length);
+        uint256 poolCount = allPools.length;
+
+        if (maxPools == 0 || maxPools > MAX_POOLS_PER_QUERY) {
+            maxPools = MAX_POOLS_PER_QUERY;
+        }
+
+        if (poolCount > maxPools) poolCount = maxPools;
+
+        address[] memory tempPools = new address[](poolCount);
+        string[] memory tempIssues = new string[](poolCount);
         uint256 count = 0;
 
-        for (uint256 i = 0; i < allPools.length; i++) {
-            (bool isHealthy, string memory issue) = this.checkPoolHealth(allPools[i]);
-            if (!isHealthy) {
+        for (uint256 i = 0; i < poolCount && count < maxPools; i++) {
+            try this.checkPoolHealth(allPools[i]) returns (bool isHealthy, string memory issue) {
+                if (!isHealthy) {
+                    tempPools[count] = allPools[i];
+                    tempIssues[count] = issue;
+                    count++;
+                }
+            } catch {
+                // Pool health check failed
                 tempPools[count] = allPools[i];
-                tempIssues[count] = issue;
+                tempIssues[count] = "Health check failed";
                 count++;
             }
         }

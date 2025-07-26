@@ -9,7 +9,6 @@ interface IPoolFactory {
         address cNGN;
         address poolMultisig;
         address[] multisigSigners;
-        address taxCollector;
         uint256 lockDuration;
         uint256 minInvestment;
         uint256 maxInvestment;
