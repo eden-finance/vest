@@ -89,8 +89,6 @@ contract MockERC20 {
         emit Transfer(from, to, amount);
     }
 
-    
-
     function _mint(address to, uint256 amount) internal {
         require(to != address(0), "ERC20: mint to the zero address");
 

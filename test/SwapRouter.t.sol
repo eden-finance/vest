@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
+
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 
@@ -270,19 +271,12 @@ contract SwapRouterTest is EdenVestTestBase {
     }
 
     function test_RevertWhen_NonOwnerSetsPoolFee() public {
-    vm.prank(user1);
-    
-    vm.expectRevert(
-        abi.encodeWithSelector(
-            Ownable.OwnableUnauthorizedAccount.selector, 
-            user1 
-        )
-    );
-    
-    swapRouterSecure.setPoolFee(address(tokenA), address(tokenB), 500);
-}
+        vm.prank(user1);
 
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, user1));
 
+        swapRouterSecure.setPoolFee(address(tokenA), address(tokenB), 500);
+    }
 
     function test_SetDefaultPoolFee_Success() public {
         uint24 newFee = 10000; // 1%
@@ -335,7 +329,6 @@ contract SwapRouterTest is EdenVestTestBase {
             "Should revert to default fee"
         );
     }
-
 
     // ============ PAUSE FUNCTIONALITY TESTS ============
 
@@ -488,19 +481,14 @@ contract SwapRouterTest is EdenVestTestBase {
         vm.stopPrank();
     }
 
-   function testFuzz_PoolFees(uint8 feeIndex) public {
-    uint24 fee = [uint24(500), 3000, 10000][feeIndex % 3];
+    function testFuzz_PoolFees(uint8 feeIndex) public {
+        uint24 fee = [uint24(500), 3000, 10000][feeIndex % 3];
 
-    vm.prank(admin);
-    swapRouterSecure.setPoolFee(address(tokenA), address(tokenB), fee);
+        vm.prank(admin);
+        swapRouterSecure.setPoolFee(address(tokenA), address(tokenB), fee);
 
-    assertEq(
-        swapRouterSecure.getPoolFee(address(tokenA), address(tokenB)),
-        fee,
-        "Pool fee should be set correctly"
-    );
-}
-
+        assertEq(swapRouterSecure.getPoolFee(address(tokenA), address(tokenB)), fee, "Pool fee should be set correctly");
+    }
 
     function testFuzz_SlippageValues(uint96 slippage) public {
         vm.assume(slippage <= 300); // Max 3%
