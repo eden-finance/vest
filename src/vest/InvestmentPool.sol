@@ -215,8 +215,6 @@ contract InvestmentPool is
 
         withdrawAmount += investment.expectedReturn;
 
-        IERC20(lpToken).safeTransferFrom(investor, address(this), investment.lpTokens);
-
         require(IERC20(lpToken).balanceOf(address(this)) >= requiredLPTokens, "LP tokens not received");
 
         ILPToken(lpToken).burn(address(this), requiredLPTokens);

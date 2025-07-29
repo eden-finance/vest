@@ -528,8 +528,6 @@ contract EdenCore is
         withdrawAmount = IInvestmentPool(pool).withdraw(msg.sender, tokenId, lpTokenAmount);
     }
 
-    // ============ VIEW FUNCTIONS ============ (Keep existing functions unchanged)
-
     function getAllPools() external view returns (address[] memory) {
         return allPools;
     }
@@ -591,8 +589,6 @@ contract EdenCore is
     function getProposalSignatureCount(uint256 proposalId) external view returns (uint256) {
         return proposals[proposalId].signatureCount;
     }
-
-    // ============ NON-CRITICAL ADMIN FUNCTIONS ============ (Keep single admin control for efficiency)
 
     function setPoolFactory(address _factory) external onlyRole(ADMIN_ROLE) {
         if (_factory == address(0)) revert InvalidAddress();
