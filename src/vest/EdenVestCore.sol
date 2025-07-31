@@ -12,13 +12,13 @@ import "./interfaces/IInvestmentPool.sol";
 import "./interfaces/ITaxCollector.sol";
 import "./interfaces/ISwapRouter.sol";
 import "./interfaces/INFTPositionManager.sol";
-
 /**
- * @title EdenCore
+ * @title EdenVestCore
  * @notice Main entry point for Eden Finance investment protocol
- * @dev Manages pools, investments, and protocol configuration with multisig controls
+ * @dev Manages pools, investments, and protocol configuration
  */
-contract EdenCore is
+
+contract EdenVestCore is
     Initializable,
     AccessControlUpgradeable,
     PausableUpgradeable,
@@ -30,17 +30,13 @@ contract EdenCore is
     bytes32 public constant POOL_CREATOR_ROLE = keccak256("POOL_CREATOR_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant EMERGENCY_ROLE = keccak256("EMERGENCY_ROLE");
-    bytes32 public constant MULTISIG_SIGNER_ROLE = keccak256("MULTISIG_SIGNER_ROLE");
-
-    // ============ MULTISIG CONSTANTS ============
-    uint256 public constant REQUIRED_SIGNATURES = 3; // Require 3 out of N signatures
-    uint256 public constant PROPOSAL_EXPIRY = 3 days;
 
     // ============ STATE VARIABLES ============
     IPoolFactory public poolFactory;
     ITaxCollector public taxCollector;
     ISwapRouter public swapRouter;
     INFTPositionManager public nftManager;
+    address public edenAdmin;
 
     address public cNGN;
     address public protocolTreasury;
@@ -52,13 +48,6 @@ contract EdenCore is
     uint256 public globalTaxRate; // basis points
     uint256 public constant MAX_TAX_RATE = 1000; // 10%
     uint256 public constant BASIS_POINTS = 10000;
-
-    // ============ MULTISIG STATE ============
-    uint256 public nextProposalId = 1;
-    mapping(uint256 => Proposal) public proposals;
-    mapping(uint256 => mapping(address => bool)) public hasSignedProposal;
-    address[] public multisigSigners;
-    mapping(address => bool) public isMultisigSigner;
 
     // ============ STRUCTS ============
     struct PoolInfo {
@@ -78,29 +67,6 @@ contract EdenCore is
         string title;
     }
 
-    struct Proposal {
-        uint256 id;
-        ProposalType proposalType;
-        address proposer;
-        uint256 createdAt;
-        uint256 expiresAt;
-        bool executed;
-        uint256 signatureCount;
-        bytes data;
-        string description;
-    }
-
-    enum ProposalType {
-        PAUSE_PROTOCOL,
-        UNPAUSE_PROTOCOL,
-        SET_GLOBAL_TAX_RATE,
-        SET_PROTOCOL_TREASURY,
-        EMERGENCY_WITHDRAW,
-        UPGRADE_CONTRACT,
-        ADD_MULTISIG_SIGNER,
-        REMOVE_MULTISIG_SIGNER
-    }
-
     // ============ EVENTS ============
     event PoolCreated(address indexed pool, string name, address indexed admin, address lpToken);
     event InvestmentMade(
@@ -109,16 +75,6 @@ contract EdenCore is
     event TaxRateUpdated(uint256 oldRate, uint256 newRate);
     event TreasuryUpdated(address oldTreasury, address newTreasury);
     event EmergencyWithdraw(address token, uint256 amount, address treasury, string reason, address admin);
-
-    // Multisig Events
-    event ProposalCreated(
-        uint256 indexed proposalId, ProposalType proposalType, address indexed proposer, string description
-    );
-    event ProposalSigned(uint256 indexed proposalId, address indexed signer, uint256 signatureCount);
-    event ProposalExecuted(uint256 indexed proposalId, address indexed executor);
-    event ProposalExpired(uint256 indexed proposalId);
-    event MultisigSignerAdded(address indexed signer);
-    event MultisigSignerRemoved(address indexed signer);
 
     // ============ ERRORS ============
     error InvalidPool();
@@ -136,27 +92,9 @@ contract EdenCore is
     error InvalidPoolName();
     error InsufficientBalance();
 
-    // Multisig Errors
-    error ProposalNotFound();
-    error ProposalAlreadyExecuted();
-    error AlreadySigned();
-    error NotMultisigSigner();
-    error InsufficientSignatures();
-    error InvalidProposalType();
-    error InvalidSignerCount();
-    error EProposalExpired();
-
     // ============ MODIFIERS ============
-    modifier onlyMultisigSigner() {
-        if (!isMultisigSigner[msg.sender]) revert NotMultisigSigner();
-        _;
-    }
-
-    modifier validProposal(uint256 proposalId) {
-        Proposal storage proposal = proposals[proposalId];
-        if (proposal.id == 0) revert ProposalNotFound();
-        if (block.timestamp > proposal.expiresAt) revert EProposalExpired();
-        if (proposal.executed) revert ProposalAlreadyExecuted();
+    modifier onlyAdminContract() {
+        require(msg.sender == edenAdmin, "Only EdenAdmin");
         _;
     }
 
@@ -174,7 +112,6 @@ contract EdenCore is
 
         if (_cNGN == address(0) || _treasury == address(0)) revert InvalidAddress();
         if (_taxRate > MAX_TAX_RATE) revert InvalidTaxRate();
-        if (_multisigSigners.length < REQUIRED_SIGNATURES) revert InvalidSignerCount();
 
         cNGN = _cNGN;
         protocolTreasury = _treasury;
@@ -184,217 +121,34 @@ contract EdenCore is
         _grantRole(ADMIN_ROLE, _admin);
         _grantRole(POOL_CREATOR_ROLE, _admin);
         _grantRole(EMERGENCY_ROLE, _admin);
-
-        for (uint256 i = 0; i < _multisigSigners.length; i++) {
-            if (_multisigSigners[i] == address(0)) revert InvalidAddress();
-            multisigSigners.push(_multisigSigners[i]);
-            isMultisigSigner[_multisigSigners[i]] = true;
-            _grantRole(MULTISIG_SIGNER_ROLE, _multisigSigners[i]);
-        }
     }
 
-    /**
-     * @notice Create a new proposal for critical operations
-     * @param proposalType Type of proposal
-     * @param data Encoded function call data
-     * @param description Human readable description
-     */
-    function createProposal(ProposalType proposalType, bytes memory data, string memory description)
-        internal
-        onlyMultisigSigner
-        returns (uint256 proposalId)
-    {
-        proposalId = nextProposalId++;
+    // ============ ADMIN SETTER FUNCTIONS ============
 
-        proposals[proposalId] = Proposal({
-            id: proposalId,
-            proposalType: proposalType,
-            proposer: msg.sender,
-            createdAt: block.timestamp,
-            expiresAt: block.timestamp + PROPOSAL_EXPIRY,
-            executed: false,
-            signatureCount: 1,
-            data: data,
-            description: description
-        });
-
-        hasSignedProposal[proposalId][msg.sender] = true;
-
-        emit ProposalCreated(proposalId, proposalType, msg.sender, description);
-        emit ProposalSigned(proposalId, msg.sender, 1);
+    function setEdenAdmin(address _edenAdmin) external onlyRole(ADMIN_ROLE) {
+        if (_edenAdmin == address(0)) revert InvalidAddress();
+        edenAdmin = _edenAdmin;
+        _grantRole(ADMIN_ROLE, _edenAdmin);
     }
 
-    /**
-     * @notice Sign a proposal
-     * @param proposalId ID of the proposal to sign
-     */
-    function signProposal(uint256 proposalId) external onlyMultisigSigner validProposal(proposalId) {
-        if (hasSignedProposal[proposalId][msg.sender]) revert AlreadySigned();
+    // ============ ADMIN FUNCTIONS (Called by EdenAdmin) ============
 
-        hasSignedProposal[proposalId][msg.sender] = true;
-        proposals[proposalId].signatureCount++;
-
-        emit ProposalSigned(proposalId, msg.sender, proposals[proposalId].signatureCount);
-
-        // Auto-execute if we have enough signatures
-        if (proposals[proposalId].signatureCount >= REQUIRED_SIGNATURES) {
-            _executeProposal(proposalId);
-        }
-    }
-
-    /**
-     * @notice Execute a proposal with sufficient signatures
-     * @param proposalId ID of the proposal to execute
-     */
-    function executeProposal(uint256 proposalId) external onlyMultisigSigner validProposal(proposalId) {
-        if (proposals[proposalId].signatureCount < REQUIRED_SIGNATURES) revert InsufficientSignatures();
-        _executeProposal(proposalId);
-    }
-
-    /**
-     * @dev Internal function to execute proposals
-     */
-    function _executeProposal(uint256 proposalId) internal {
-        Proposal storage proposal = proposals[proposalId];
-        proposal.executed = true;
-
-        if (proposal.proposalType == ProposalType.PAUSE_PROTOCOL) {
-            _pause();
-        } else if (proposal.proposalType == ProposalType.UNPAUSE_PROTOCOL) {
-            _unpause();
-        } else if (proposal.proposalType == ProposalType.SET_GLOBAL_TAX_RATE) {
-            uint256 newRate = abi.decode(proposal.data, (uint256));
-            _setGlobalTaxRateInternal(newRate);
-        } else if (proposal.proposalType == ProposalType.SET_PROTOCOL_TREASURY) {
-            address newTreasury = abi.decode(proposal.data, (address));
-            _setProtocolTreasuryInternal(newTreasury);
-        } else if (proposal.proposalType == ProposalType.EMERGENCY_WITHDRAW) {
-            (address token, uint256 amount, string memory reason) =
-                abi.decode(proposal.data, (address, uint256, string));
-            _emergencyWithdrawInternal(token, amount, reason);
-        } else if (proposal.proposalType == ProposalType.ADD_MULTISIG_SIGNER) {
-            address newSigner = abi.decode(proposal.data, (address));
-            _addMultisigSigner(newSigner);
-        } else if (proposal.proposalType == ProposalType.REMOVE_MULTISIG_SIGNER) {
-            address signerToRemove = abi.decode(proposal.data, (address));
-            _removeMultisigSigner(signerToRemove);
-        }
-
-        emit ProposalExecuted(proposalId, msg.sender);
-    }
-
-    /**
-     * @notice Create proposal to pause protocol
-     */
-    function proposePauseProtocol(string memory reason) external onlyMultisigSigner returns (uint256) {
-        return createProposal(ProposalType.PAUSE_PROTOCOL, "", string.concat("Pause Protocol: ", reason));
-    }
-
-    /**
-     * @notice Create proposal to unpause protocol
-     */
-    function proposeUnpauseProtocol(string memory reason) external onlyMultisigSigner returns (uint256) {
-        return createProposal(ProposalType.UNPAUSE_PROTOCOL, "", string.concat("Unpause Protocol: ", reason));
-    }
-
-    /**
-     * @notice Create proposal to update global tax rate
-     */
-    function proposeSetGlobalTaxRate(uint256 newRate, string memory reason)
-        external
-        onlyMultisigSigner
-        returns (uint256)
-    {
-        if (newRate > MAX_TAX_RATE) revert InvalidTaxRate();
-
-        return createProposal(
-            ProposalType.SET_GLOBAL_TAX_RATE,
-            abi.encode(newRate),
-            string.concat("Set Global Tax Rate to ", _uint2str(newRate), " basis points: ", reason)
-        );
-    }
-
-    /**
-     * @notice Create proposal to update protocol treasury
-     */
-    function proposeSetProtocolTreasury(address newTreasury, string memory reason)
-        external
-        onlyMultisigSigner
-        returns (uint256)
-    {
-        if (newTreasury == address(0)) revert InvalidAddress();
-
-        return createProposal(
-            ProposalType.SET_PROTOCOL_TREASURY,
-            abi.encode(newTreasury),
-            string.concat("Set Protocol Treasury: ", reason)
-        );
-    }
-
-    /**
-     * @notice Create proposal for emergency withdrawal
-     */
-    function proposeEmergencyWithdraw(address token, uint256 amount, string memory reason)
-        external
-        onlyMultisigSigner
-        returns (uint256)
-    {
-        return createProposal(
-            ProposalType.EMERGENCY_WITHDRAW,
-            abi.encode(token, amount, reason),
-            string.concat("Emergency Withdraw: ", reason)
-        );
-    }
-
-    /**
-     * @notice Create proposal to add multisig signer
-     */
-    function proposeAddMultisigSigner(address newSigner, string memory reason)
-        external
-        onlyMultisigSigner
-        returns (uint256)
-    {
-        if (newSigner == address(0)) revert InvalidAddress();
-        if (isMultisigSigner[newSigner]) revert InvalidAddress(); // Already a signer
-
-        return createProposal(
-            ProposalType.ADD_MULTISIG_SIGNER, abi.encode(newSigner), string.concat("Add Multisig Signer: ", reason)
-        );
-    }
-
-    /**
-     * @notice Create proposal to remove multisig signer
-     */
-    function proposeRemoveMultisigSigner(address signerToRemove, string memory reason)
-        external
-        onlyMultisigSigner
-        returns (uint256)
-    {
-        if (!isMultisigSigner[signerToRemove]) revert InvalidAddress();
-        if (multisigSigners.length <= REQUIRED_SIGNATURES) revert InvalidSignerCount(); // Can't go below minimum
-
-        return createProposal(
-            ProposalType.REMOVE_MULTISIG_SIGNER,
-            abi.encode(signerToRemove),
-            string.concat("Remove Multisig Signer: ", reason)
-        );
-    }
-
-    // ============ INTERNAL MULTISIG EXECUTION FUNCTIONS ============
-
-    function _setGlobalTaxRateInternal(uint256 _rate) internal {
+    function setGlobalTaxRateInternal(uint256 _rate) external onlyAdminContract {
         uint256 oldRate = globalTaxRate;
         globalTaxRate = _rate;
         emit TaxRateUpdated(oldRate, _rate);
     }
 
-    function _setProtocolTreasuryInternal(address _treasury) internal {
+    function setProtocolTreasuryInternal(address _treasury) external onlyAdminContract {
         address oldTreasury = protocolTreasury;
         protocolTreasury = _treasury;
         emit TreasuryUpdated(oldTreasury, _treasury);
     }
 
-    function _emergencyWithdrawInternal(address token, uint256 amount, string memory reason) internal {
+    function emergencyWithdrawInternal(address token, uint256 amount, string memory reason)
+        external
+        onlyAdminContract
+    {
         uint256 balance = IERC20(token).balanceOf(address(this));
         if (amount > balance) revert InsufficientBalance();
 
@@ -402,27 +156,15 @@ contract EdenCore is
         emit EmergencyWithdraw(token, amount, protocolTreasury, reason, msg.sender);
     }
 
-    function _addMultisigSigner(address newSigner) internal {
-        multisigSigners.push(newSigner);
-        isMultisigSigner[newSigner] = true;
-        _grantRole(MULTISIG_SIGNER_ROLE, newSigner);
-        emit MultisigSignerAdded(newSigner);
+    function pauseProtocol() external onlyAdminContract {
+        _pause();
     }
 
-    function _removeMultisigSigner(address signerToRemove) internal {
-        isMultisigSigner[signerToRemove] = false;
-        _revokeRole(MULTISIG_SIGNER_ROLE, signerToRemove);
-
-        // Remove from array
-        for (uint256 i = 0; i < multisigSigners.length; i++) {
-            if (multisigSigners[i] == signerToRemove) {
-                multisigSigners[i] = multisigSigners[multisigSigners.length - 1];
-                multisigSigners.pop();
-                break;
-            }
-        }
-        emit MultisigSignerRemoved(signerToRemove);
+    function unpauseProtocol() external onlyAdminContract {
+        _unpause();
     }
+
+    // ============ CORE FUNCTIONS ============
 
     function createPool(IPoolFactory.PoolParams memory poolParams)
         external
@@ -528,6 +270,8 @@ contract EdenCore is
         withdrawAmount = IInvestmentPool(pool).withdraw(msg.sender, tokenId, lpTokenAmount);
     }
 
+    // ============ VIEW FUNCTIONS ============
+
     function getAllPools() external view returns (address[] memory) {
         return allPools;
     }
@@ -560,35 +304,7 @@ contract EdenCore is
         hasLiquidity = expectedOut > 0;
     }
 
-    // ============ MULTISIG VIEW FUNCTIONS ============
-
-    /**
-     * @notice Get proposal details
-     */
-    function getProposal(uint256 proposalId) external view returns (Proposal memory) {
-        return proposals[proposalId];
-    }
-
-    /**
-     * @notice Get all multisig signers
-     */
-    function getMultisigSigners() external view returns (address[] memory) {
-        return multisigSigners;
-    }
-
-    /**
-     * @notice Check if address has signed a proposal
-     */
-    function hasSignedProposalView(uint256 proposalId, address signer) external view returns (bool) {
-        return hasSignedProposal[proposalId][signer];
-    }
-
-    /**
-     * @notice Get signature count for a proposal
-     */
-    function getProposalSignatureCount(uint256 proposalId) external view returns (uint256) {
-        return proposals[proposalId].signatureCount;
-    }
+    // ============ ADMIN SETTER FUNCTIONS ============
 
     function setPoolFactory(address _factory) external onlyRole(ADMIN_ROLE) {
         if (_factory == address(0)) revert InvalidAddress();
@@ -613,27 +329,6 @@ contract EdenCore is
     function setPoolActive(address pool, bool active) external onlyRole(ADMIN_ROLE) {
         if (!isRegisteredPool[pool]) revert InvalidPool();
         poolInfo[pool].isActive = active;
-    }
-
-    function _uint2str(uint256 _i) internal pure returns (string memory str) {
-        if (_i == 0) return "0";
-
-        uint256 j = _i;
-        uint256 length;
-        while (j != 0) {
-            length++;
-            j /= 10;
-        }
-
-        bytes memory bstr = new bytes(length);
-        uint256 k = length;
-        j = _i;
-        while (j != 0) {
-            bstr[--k] = bytes1(uint8(48 + j % 10));
-            j /= 10;
-        }
-
-        str = string(bstr);
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyRole(ADMIN_ROLE) {}

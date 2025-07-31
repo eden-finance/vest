@@ -22,6 +22,7 @@ contract TaxCollector is ITaxCollector, Ownable {
     event TaxCollected(address indexed token, uint256 amount, address indexed pool);
     event TaxWithdrawn(address indexed token, uint256 amount, address indexed to);
     event TreasuryUpdated(address oldTreasury, address newTreasury);
+    event EdenCoreUpdated(address oldTreasury, address _treasury);
 
     constructor(address _treasury, address _owner, address _edenCore) Ownable(_owner) {
         require(_treasury != address(0), "Invalid treasury");
@@ -52,6 +53,13 @@ contract TaxCollector is ITaxCollector, Ownable {
         address oldTreasury = treasury;
         treasury = _treasury;
         emit TreasuryUpdated(oldTreasury, _treasury);
+    }
+
+    function setEdenCore(address _edenCore) external onlyOwner {
+        require(_edenCore != address(0), "Invalid EdenCore");
+        address oldEdenCore = edenCore;
+        edenCore = _edenCore;
+        emit EdenCoreUpdated(oldEdenCore, _edenCore);
     }
 
     function getPoolTaxCollected(address pool) external view returns (uint256) {

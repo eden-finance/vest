@@ -314,7 +314,7 @@ forge script --chain 42421 script/EdenCore.s.sol:DeployEdenCoreScript --rpc-url 
 
 ```bash
 # Deploy with mock tokens
-forge script --chain 42421 script/EdenCore.s.sol:DeployEdenCoreScript --rpc-url $TESTNET_RPC --broadcast --private-key $PRIVATE_KEY --gas-limit 60000000
+forge script --chain 42421 script/EdenVest.s.sol:DeployScript --rpc-url $TESTNET_RPC --broadcast --private-key $PRIVATE_KEY --gas-limit 60000000
 ```
 
 ## 📡 API Reference

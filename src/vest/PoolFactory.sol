@@ -35,11 +35,7 @@ contract PoolFactory is IPoolFactory, Ownable {
     }
 
     // ============ CONSTRUCTOR ============
-    constructor(address _owner) Ownable(_owner) {
-        // Deploy implementation contracts
-        poolImplementation = address(new InvestmentPool());
-        lpTokenImplementation = address(new LPToken());
-    }
+    constructor(address _owner) Ownable(_owner) {}
 
     // ============ FACTORY FUNCTIONS ============
 

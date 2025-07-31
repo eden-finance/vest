@@ -15,7 +15,8 @@ remappings = [
 optimizer = true
 optimizer_runs = 100000
 via_ir = true
-
+fs_permissions = [{ access = "read-write", path = "./deployments" }]
+ffi = true
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
 
