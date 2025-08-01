@@ -13,8 +13,8 @@ contract EdenAdmin is AccessControl {
     bytes32 public constant MULTISIG_SIGNER_ROLE = keccak256("MULTISIG_SIGNER_ROLE");
 
     // ============ MULTISIG CONSTANTS ============
-    uint256 public constant REQUIRED_SIGNATURES = 3; // Require 3 out of N signatures
-    uint256 public constant PROPOSAL_EXPIRY = 3 days;
+    uint256 public constant REQUIRED_SIGNATURES = 2;
+    uint256 public constant PROPOSAL_EXPIRY = 2 days;
 
     // ============ STATE VARIABLES ============
     address public edenCore;

@@ -5,6 +5,8 @@ pragma solidity ^0.8.22;
 import "forge-std/console.sol";
 import "./EdenVestTestBase.sol";
 import "../src/vest/interfaces/IInvestmentPool.sol";
+import "../src/vest/EdenAdmin.sol";
+
 
 contract EdenCoreTest is EdenVestTestBase {
     address public pool;
@@ -27,7 +29,7 @@ contract EdenCoreTest is EdenVestTestBase {
     // ============ Initialization Tests ============
 
     function test_Initialize_Success() public {
-        EdenCore newCore = new EdenCore();
+        EdenVestCore newCore = new EdenVestCore();
         newCore.initialize(address(cNGN), treasury, admin, 250, multisigSigners);
 
         assertEq(newCore.cNGN(), address(cNGN), "cNGN not set");
@@ -43,34 +45,34 @@ contract EdenCoreTest is EdenVestTestBase {
     }
 
     function test_RevertWhen_InitializeWithZeroAddress() public {
-        EdenCore newCore = new EdenCore();
+        EdenVestCore newCore = new EdenVestCore();
 
-        vm.expectRevert(EdenCore.InvalidAddress.selector);
+        vm.expectRevert(EdenVestCore.InvalidAddress.selector);
         newCore.initialize(address(0), treasury, admin, 250, multisigSigners);
 
-        vm.expectRevert(EdenCore.InvalidAddress.selector);
+        vm.expectRevert(EdenVestCore.InvalidAddress.selector);
         newCore.initialize(address(cNGN), address(0), admin, 250, multisigSigners);
     }
 
     function test_RevertWhen_InitializeWithHighTaxRate() public {
-        EdenCore newCore = new EdenCore();
+        EdenVestCore newCore = new EdenVestCore();
 
-        vm.expectRevert(EdenCore.InvalidTaxRate.selector);
+        vm.expectRevert(EdenVestCore.InvalidTaxRate.selector);
         newCore.initialize(address(cNGN), treasury, admin, 1001, multisigSigners); // > 10%
     }
 
     function test_RevertWhen_InitializeWithInsufficientSigners() public {
-        EdenCore newCore = new EdenCore();
+        EdenVestCore newCore = new EdenVestCore();
         address[] memory insufficientSigners = new address[](2);
         insufficientSigners[0] = address(0x10);
         insufficientSigners[1] = address(0x11);
 
-        vm.expectRevert(EdenCore.InvalidSignerCount.selector);
+        vm.expectRevert(EdenVestCore.InvalidSignerCount.selector);
         newCore.initialize(address(cNGN), treasury, admin, 250, insufficientSigners);
     }
 
     function test_AdminHasRole() public {
-        EdenCore newCore = new EdenCore();
+        EdenVestCore newCore = new EdenVestCore();
         newCore.initialize(address(cNGN), treasury, admin, 250, multisigSigners);
 
         assertTrue(newCore.hasRole(newCore.EMERGENCY_ROLE(), admin), "Emergency role not granted");
@@ -83,7 +85,7 @@ contract EdenCoreTest is EdenVestTestBase {
         vm.prank(multisigSigners[0]);
         uint256 proposalId = edenCore.proposePauseProtocol("Security issue detected");
 
-        (uint256 id, EdenCore.ProposalType proposalType, address proposer,,, bool executed, uint256 signatureCount,,) =
+        (uint256 id, EdenAdmin.ProposalType proposalType, address proposer,,, bool executed, uint256 signatureCount,,) =
             edenCore.proposals(proposalId);
 
         assertEq(id, proposalId, "Proposal ID mismatch");
@@ -162,7 +164,7 @@ contract EdenCoreTest is EdenVestTestBase {
 
     function test_RevertWhen_NonSignerCreatesProposal() public {
         vm.prank(user1);
-        vm.expectRevert(EdenCore.NotMultisigSigner.selector);
+        vm.expectRevert(EdenVestCore.NotMultisigSigner.selector);
         edenCore.proposePauseProtocol("Not a signer");
     }
 
@@ -171,7 +173,7 @@ contract EdenCoreTest is EdenVestTestBase {
         uint256 proposalId = edenCore.proposePauseProtocol("Test");
 
         vm.prank(multisigSigners[0]);
-        vm.expectRevert(EdenCore.AlreadySigned.selector);
+        vm.expectRevert(EdenVestCore.AlreadySigned.selector);
         edenCore.signProposal(proposalId);
     }
 
@@ -180,7 +182,7 @@ contract EdenCoreTest is EdenVestTestBase {
         uint256 proposalId = edenCore.proposePauseProtocol("Test");
 
         vm.prank(multisigSigners[1]);
-        vm.expectRevert(EdenCore.InsufficientSignatures.selector);
+        vm.expectRevert(EdenVestCore.InsufficientSignatures.selector);
         edenCore.executeProposal(proposalId);
     }
 
@@ -191,7 +193,7 @@ contract EdenCoreTest is EdenVestTestBase {
         vm.warp(block.timestamp + 4 days);
 
         vm.prank(multisigSigners[1]);
-        vm.expectRevert(EdenCore.EProposalExpired.selector);
+        vm.expectRevert(EdenVestCore.EProposalExpired.selector);
         edenCore.signProposal(proposalId);
     }
 
@@ -293,7 +295,7 @@ contract EdenCoreTest is EdenVestTestBase {
         vm.startPrank(user1);
         cNGN.approve(address(edenCore), 10000e18);
 
-        vm.expectRevert(EdenCore.InvalidPool.selector);
+        vm.expectRevert(EdenVestCore.InvalidPool.selector);
         edenCore.invest(address(0x999), 10000e18, "Test", 0);
         vm.stopPrank();
     }
@@ -305,7 +307,7 @@ contract EdenCoreTest is EdenVestTestBase {
         vm.startPrank(user1);
         cNGN.approve(address(edenCore), 10000e18);
 
-        vm.expectRevert(EdenCore.PoolNotActive.selector);
+        vm.expectRevert(EdenVestCore.PoolNotActive.selector);
         edenCore.invest(pool, 10000e18, "Test", 0);
         vm.stopPrank();
     }
@@ -394,7 +396,7 @@ contract EdenCoreTest is EdenVestTestBase {
         vm.prank(multisigSigners[0]);
         uint256 proposalId = edenCore.proposePauseProtocol("Test proposal");
 
-        EdenCore.Proposal memory proposal = edenCore.getProposal(proposalId);
+        EdenAdmin.Proposal memory proposal = edenCore.getProposal(proposalId);
 
         assertEq(proposal.id, proposalId, "Proposal ID mismatch");
         assertTrue(uint256(proposal.proposalType) == 0, "Proposal type mismatch");

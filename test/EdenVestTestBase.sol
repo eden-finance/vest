@@ -20,7 +20,7 @@ contract MockcNGN is MockERC20 {
 }
 
 contract EdenVestTestBase is Test {
-    EdenCore public edenCore;
+    EdenVestCore public edenCore;
     PoolFactory public poolFactory;
     TaxCollector public taxCollector;
     SwapRouter public swapRouter;
@@ -55,7 +55,7 @@ contract EdenVestTestBase is Test {
         address mockUniswapQuoter = address(0x101);
         swapRouter = new SwapRouter(mockUniswapRouter, mockUniswapQuoter, admin);
 
-        edenCore = new EdenCore();
+        edenCore = new EdenVestCore();
         edenCore.initialize(address(cNGN), treasury, admin, 250, multisigSigners); // 2.5% tax
         taxCollector = new TaxCollector(treasury, admin, address(edenCore));
 

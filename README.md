@@ -71,8 +71,8 @@ graph TB
 
 ```bash
 # Clone the repository
-git clone https://github.com/eden-finance/eden-vest.git
-cd eden-vest
+git clone https://github.com/eden-finance/vest.git
+cd vest
 
 # Install dependencies
 forge install
