@@ -52,6 +52,10 @@ contract PoolFactory is IPoolFactory, Ownable {
         require(params.lockDuration >= 7 days, "Duration too short");
         require(params.minInvestment > 0, "Invalid min investment");
 
+
+        require(address(lpTokenImplementation) != address(0),"No LP token implementation");
+         require(address(poolImplementation) != address(0),"No Pool implementation");
+
         // Deploy LP token clone
         address lpToken = lpTokenImplementation.clone();
 

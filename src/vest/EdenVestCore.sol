@@ -68,7 +68,6 @@ contract EdenVestCore is
     }
 
     // ============ EVENTS ============
-    event PoolCreated(address indexed pool, string name, address indexed admin, address lpToken);
     event InvestmentMade(
         address indexed pool, address indexed investor, uint256 tokenId, uint256 amount, uint256 lpTokens
     );
@@ -102,8 +101,7 @@ contract EdenVestCore is
         address _cNGN,
         address _treasury,
         address _admin,
-        uint256 _taxRate,
-        address[] memory _multisigSigners
+        uint256 _taxRate
     ) public initializer {
         __AccessControl_init();
         __Pausable_init();
@@ -131,7 +129,7 @@ contract EdenVestCore is
         _grantRole(ADMIN_ROLE, _edenAdmin);
     }
 
-    // ============ ADMIN FUNCTIONS (Called by EdenAdmin) ============
+    // ============ ADMIN FUNCTION ============
 
     function setGlobalTaxRateInternal(uint256 _rate) external onlyAdminContract {
         uint256 oldRate = globalTaxRate;
@@ -192,8 +190,6 @@ contract EdenVestCore is
             createdAt: block.timestamp,
             isActive: true
         });
-
-        emit PoolCreated(pool, poolParams.name, poolParams.admin, poolInfo[pool].lpToken);
     }
 
     function invest(address pool, uint256 amount, string memory title, uint256 deadline)

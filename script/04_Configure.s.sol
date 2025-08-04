@@ -8,6 +8,9 @@ import "forge-std/console.sol";
 import "../src/vest/EdenVestCore.sol";
 import "../src/vest/PoolFactory.sol";
 import "../src/vest/TaxCollector.sol";
+import "../src/vest/InvestmentPool.sol";
+import "../src/vest/LPToken.sol";
+
 
 /**
  * @title Final Configuration
@@ -45,6 +48,13 @@ contract ConfigureScript is Script {
         factory.setTaxCollector(taxCollector);
         factory.setNFTManager(nftPositionManager);
         console.log("PoolFactory configured");
+
+        // configure implementation contracts
+        LPToken lptoken = new LPToken();
+        InvestmentPool investmentPool = new InvestmentPool();
+
+        factory.updateLPTokenImplementation(address(lptoken));
+        factory.updatePoolImplementation(address(investmentPool));
 
         // Configure TaxCollector
         console.log("Configuring TaxCollector...");
