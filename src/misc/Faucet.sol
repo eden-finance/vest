@@ -3,9 +3,10 @@ pragma solidity ^0.8.22;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title FaucetToken
@@ -20,7 +21,7 @@ contract FaucetToken is ERC20, Ownable {
         uint8 decimals_,
         uint256 initialSupply,
         address owner
-    ) ERC20(name, symbol) {
+    ) ERC20(name, symbol) Ownable(owner) {
         _decimals = decimals_;
         _mint(owner, initialSupply * 10**decimals_);
         _transferOwnership(owner);
@@ -43,9 +44,10 @@ contract FaucetToken is ERC20, Ownable {
  * @title EdenVestFaucet
  * @dev Comprehensive faucet system for testnet tokens and native currency
  * @notice Supports both ERC20 tokens and native token distribution with rate limiting
+ * @notice Updated to use Math library instead of deprecated SafeMath
  */
 contract EdenVestFaucet is Ownable, ReentrancyGuard, Pausable {
-    using SafeMath for uint256;
+    using Math for uint256;
     
     // ============ Events ============
     
@@ -146,12 +148,12 @@ contract EdenVestFaucet is Ownable, ReentrancyGuard, Pausable {
     
     // ============ Constructor ============
     
-    constructor() {
+    constructor() Ownable(msg.sender) {
         // Default native token configuration
         nativeConfig = TokenConfig({
-            amount: 0.0001 ether,           // 1 native token
-            cooldown: 1 hours,         // 1 hour cooldown
-            dailyLimit: 2,            // 10 claims per day
+            amount: 0.1 ether,      // 0.1 native token
+            cooldown: 1 hours,      // 1 hour cooldown
+            dailyLimit: 2,          // 2 claims per day
             enabled: true,
             exists: true
         });
@@ -332,13 +334,15 @@ contract EdenVestFaucet is Ownable, ReentrancyGuard, Pausable {
         _checkRateLimit(userClaim, config);
         
         // Update user claim data
-        _updateUserClaim(userClaim, config);
+        _updateUserClaim(userClaim);
         
         // Transfer tokens
         IERC20(token).transfer(msg.sender, config.amount);
         
-        // Update stats
-        totalClaims[token] = totalClaims[token].add(1);
+        // Update stats using unchecked for gas optimization (overflow safe in Solidity 0.8+)
+        unchecked {
+            totalClaims[token] = totalClaims[token] + 1;
+        }
         
         emit TokenClaimed(msg.sender, token, config.amount, block.timestamp);
     }
@@ -356,13 +360,15 @@ contract EdenVestFaucet is Ownable, ReentrancyGuard, Pausable {
         _checkRateLimit(userClaim, nativeConfig);
         
         // Update user claim data
-        _updateUserClaim(userClaim, nativeConfig);
+        _updateUserClaim(userClaim);
         
         // Transfer native tokens
         payable(msg.sender).transfer(nativeConfig.amount);
         
-        // Update stats
-        totalNativeClaims = totalNativeClaims.add(1);
+        // Update stats using unchecked for gas optimization
+        unchecked {
+            totalNativeClaims = totalNativeClaims + 1;
+        }
         
         emit NativeClaimed(msg.sender, nativeConfig.amount, block.timestamp);
     }
@@ -373,7 +379,10 @@ contract EdenVestFaucet is Ownable, ReentrancyGuard, Pausable {
     function claimMultiple(address[] calldata tokens) external {
         for (uint256 i = 0; i < tokens.length; i++) {
             if (tokenConfigs[tokens[i]].exists && tokenConfigs[tokens[i]].enabled) {
-                this.claimTokens(tokens[i]);
+                // Check if user can claim before making external call
+                if (_canClaimInternal(msg.sender, tokens[i])) {
+                    this.claimTokens(tokens[i]);
+                }
             }
         }
     }
@@ -387,7 +396,7 @@ contract EdenVestFaucet is Ownable, ReentrancyGuard, Pausable {
         
         // Check cooldown
         require(
-            block.timestamp >= userClaim.lastClaimTime.add(config.cooldown),
+            block.timestamp >= userClaim.lastClaimTime + config.cooldown,
             "Cooldown not met"
         );
         
@@ -397,7 +406,7 @@ contract EdenVestFaucet is Ownable, ReentrancyGuard, Pausable {
         }
     }
     
-    function _updateUserClaim(UserClaim storage userClaim, TokenConfig memory config) internal {
+    function _updateUserClaim(UserClaim storage userClaim) internal {
         uint256 currentDay = block.timestamp / SECONDS_PER_DAY;
         
         // Reset daily counter if new day
@@ -406,9 +415,35 @@ contract EdenVestFaucet is Ownable, ReentrancyGuard, Pausable {
             userClaim.lastResetDay = currentDay;
         }
         
-        // Update claim data
+        // Update claim data using unchecked for gas optimization
         userClaim.lastClaimTime = block.timestamp;
-        userClaim.dailyClaims = userClaim.dailyClaims.add(1);
+        unchecked {
+            userClaim.dailyClaims = userClaim.dailyClaims + 1;
+        }
+    }
+    
+    function _canClaimInternal(address user, address token) internal view returns (bool) {
+        if (!tokenConfigs[token].exists || !tokenConfigs[token].enabled) {
+            return false;
+        }
+        
+        if (whitelist[user]) return true;
+        
+        TokenConfig memory config = tokenConfigs[token];
+        UserClaim memory userClaim = userClaims[user][token];
+        
+        // Check cooldown
+        if (block.timestamp < userClaim.lastClaimTime + config.cooldown) {
+            return false;
+        }
+        
+        // Check daily limit
+        uint256 currentDay = block.timestamp / SECONDS_PER_DAY;
+        if (userClaim.lastResetDay == currentDay && userClaim.dailyClaims >= config.dailyLimit) {
+            return false;
+        }
+        
+        return true;
     }
     
     // ============ Fund Management ============
@@ -509,27 +544,7 @@ contract EdenVestFaucet is Ownable, ReentrancyGuard, Pausable {
     }
     
     function canClaim(address user, address token) external view returns (bool) {
-        if (!tokenConfigs[token].exists || !tokenConfigs[token].enabled) {
-            return false;
-        }
-        
-        if (whitelist[user]) return true;
-        
-        TokenConfig memory config = tokenConfigs[token];
-        UserClaim memory userClaim = userClaims[user][token];
-        
-        // Check cooldown
-        if (block.timestamp < userClaim.lastClaimTime.add(config.cooldown)) {
-            return false;
-        }
-        
-        // Check daily limit
-        uint256 currentDay = block.timestamp / SECONDS_PER_DAY;
-        if (userClaim.lastResetDay == currentDay && userClaim.dailyClaims >= config.dailyLimit) {
-            return false;
-        }
-        
-        return true;
+        return _canClaimInternal(user, token);
     }
     
     function canClaimNative(address user) external view returns (bool) {
@@ -540,7 +555,7 @@ contract EdenVestFaucet is Ownable, ReentrancyGuard, Pausable {
         UserClaim memory userClaim = nativeClaims[user];
         
         // Check cooldown
-        if (block.timestamp < userClaim.lastClaimTime.add(nativeConfig.cooldown)) {
+        if (block.timestamp < userClaim.lastClaimTime + nativeConfig.cooldown) {
             return false;
         }
         
@@ -566,14 +581,14 @@ contract EdenVestFaucet is Ownable, ReentrancyGuard, Pausable {
         UserClaim memory userClaim = userClaims[user][token];
         TokenConfig memory config = tokenConfigs[token];
         
-        return userClaim.lastClaimTime.add(config.cooldown);
+        return userClaim.lastClaimTime + config.cooldown;
     }
     
     function getNextNativeClaimTime(address user) external view returns (uint256) {
         if (whitelist[user]) return block.timestamp;
         
         UserClaim memory userClaim = nativeClaims[user];
-        return userClaim.lastClaimTime.add(nativeConfig.cooldown);
+        return userClaim.lastClaimTime + nativeConfig.cooldown;
     }
     
     // ============ Emergency Functions ============
