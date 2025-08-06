@@ -47,13 +47,12 @@ contract CreatePool is Script {
             minInvestment: 1000e18, // 1,000 cNGN
             maxInvestment: 1000000e18, // 1,000,000 cNGN
             utilizationCap: 10000000e18, // 10,000,000 cNGN
-            expectedRate: 2000, // 20% APY (in basis points)
+            expectedRate: 2000, // 20% APY
             taxRate: 0 // No pool-specific tax, use global
         });
 
         EdenVestCore edenCore = EdenVestCore(edenCoreProxy);
         address pool = edenCore.createPool(poolParams);
-
 
         // TODO: authorize pool via nft position contract
 
