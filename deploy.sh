@@ -117,7 +117,7 @@ export EDEN_CORE_PROXY EDEN_ADMIN
 export POOL_FACTORY NFT_POSITION_MANAGER
 export POOL_IMPLEMENTATION LP_TOKEN_IMPLEMENTATION
 
-forge script script/04_Configure.s.sol:ConfigureScript \
+forge script script/04a_Configure.s.sol:ConfigureScript \
   --broadcast \
   --rpc-url "$RPC_URL" \
     --legacy \

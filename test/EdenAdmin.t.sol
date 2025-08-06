@@ -14,7 +14,7 @@ contract EdenAdminTest is EdenVestTestBase {
 
         // Create EdenAdmin contract
         edenAdmin = new EdenAdmin(address(edenCore), admin, multisigSigners);
-        
+
         // Set EdenAdmin in EdenCore
         vm.prank(admin);
         edenCore.setEdenAdmin(address(edenAdmin));
@@ -54,7 +54,7 @@ contract EdenAdminTest is EdenVestTestBase {
     function test_RevertWhen_InitializeWithZeroAddressSigner() public {
         address[] memory invalidSigners = new address[](3);
         invalidSigners[0] = address(0x10);
-        invalidSigners[1] = address(0);  // Zero address
+        invalidSigners[1] = address(0); // Zero address
         invalidSigners[2] = address(0x12);
 
         vm.expectRevert(EdenAdmin.InvalidAddress.selector);
@@ -94,7 +94,7 @@ contract EdenAdminTest is EdenVestTestBase {
 
         EdenAdmin.Proposal memory proposal = edenAdmin.getProposal(proposalId);
         assertTrue(uint256(proposal.proposalType) == 2, "Proposal type should be SET_GLOBAL_TAX_RATE");
-        
+
         uint256 decodedRate = abi.decode(proposal.data, (uint256));
         assertEq(decodedRate, newRate, "Encoded rate mismatch");
     }
@@ -107,7 +107,7 @@ contract EdenAdminTest is EdenVestTestBase {
 
         EdenAdmin.Proposal memory proposal = edenAdmin.getProposal(proposalId);
         assertTrue(uint256(proposal.proposalType) == 3, "Proposal type should be SET_PROTOCOL_TREASURY");
-        
+
         address decodedTreasury = abi.decode(proposal.data, (address));
         assertEq(decodedTreasury, newTreasury, "Encoded treasury mismatch");
     }
@@ -122,8 +122,8 @@ contract EdenAdminTest is EdenVestTestBase {
 
         EdenAdmin.Proposal memory proposal = edenAdmin.getProposal(proposalId);
         assertTrue(uint256(proposal.proposalType) == 4, "Proposal type should be EMERGENCY_WITHDRAW");
-        
-        (address decodedToken, uint256 decodedAmount, string memory decodedReason) = 
+
+        (address decodedToken, uint256 decodedAmount, string memory decodedReason) =
             abi.decode(proposal.data, (address, uint256, string));
         assertEq(decodedToken, token, "Encoded token mismatch");
         assertEq(decodedAmount, amount, "Encoded amount mismatch");
@@ -138,7 +138,7 @@ contract EdenAdminTest is EdenVestTestBase {
 
         EdenAdmin.Proposal memory proposal = edenAdmin.getProposal(proposalId);
         assertTrue(uint256(proposal.proposalType) == 6, "Proposal type should be ADD_MULTISIG_SIGNER");
-        
+
         address decodedSigner = abi.decode(proposal.data, (address));
         assertEq(decodedSigner, newSigner, "Encoded signer mismatch");
     }
@@ -149,7 +149,7 @@ contract EdenAdminTest is EdenVestTestBase {
 
         EdenAdmin.Proposal memory proposal = edenAdmin.getProposal(proposalId);
         assertTrue(uint256(proposal.proposalType) == 7, "Proposal type should be REMOVE_MULTISIG_SIGNER");
-        
+
         address decodedSigner = abi.decode(proposal.data, (address));
         assertEq(decodedSigner, multisigSigners[2], "Encoded signer mismatch");
     }
@@ -202,14 +202,14 @@ contract EdenAdminTest is EdenVestTestBase {
         vm.prank(multisigSigners[1]);
         edenAdmin.signProposal(removeProposalId1);
 
-        // Remove second signer  
+        // Remove second signer
         vm.prank(multisigSigners[0]);
         uint256 removeProposalId2 = edenAdmin.proposeRemoveMultisigSigner(multisigSigners[1], "Remove 2");
 
         vm.prank(address(0x999)); // The newly added signer
         edenAdmin.signProposal(removeProposalId2);
 
-        // Now we should have exactly REQUIRED_SIGNATURES signers, 
+        // Now we should have exactly REQUIRED_SIGNATURES signers,
         // trying to remove one more should fail
         vm.prank(multisigSigners[0]);
         vm.expectRevert(EdenAdmin.InvalidSignerCount.selector);
@@ -357,7 +357,8 @@ contract EdenAdminTest is EdenVestTestBase {
 
         // Create proposal
         vm.prank(multisigSigners[0]);
-        uint256 proposalId = edenAdmin.proposeEmergencyWithdraw(address(cNGN), withdrawAmount, "Emergency fund recovery");
+        uint256 proposalId =
+            edenAdmin.proposeEmergencyWithdraw(address(cNGN), withdrawAmount, "Emergency fund recovery");
 
         // Sign by second signer - should auto-execute
         vm.prank(multisigSigners[1]);
@@ -477,7 +478,9 @@ contract EdenAdminTest is EdenVestTestBase {
         uint256 proposalId = edenAdmin.proposePauseProtocol("Test");
 
         assertTrue(edenAdmin.hasSignedProposalView(proposalId, multisigSigners[0]), "Proposer should have signed");
-        assertFalse(edenAdmin.hasSignedProposalView(proposalId, multisigSigners[1]), "Other signer should not have signed");
+        assertFalse(
+            edenAdmin.hasSignedProposalView(proposalId, multisigSigners[1]), "Other signer should not have signed"
+        );
 
         vm.prank(multisigSigners[1]);
         edenAdmin.signProposal(proposalId);
@@ -548,7 +551,7 @@ contract EdenAdminTest is EdenVestTestBase {
 
     function test_LargeSignerSet() public {
         address[] memory largeSignerSet = new address[](10);
-        for (uint i = 0; i < 10; i++) {
+        for (uint256 i = 0; i < 10; i++) {
             largeSignerSet[i] = address(uint160(0x1000 + i));
         }
 
@@ -584,7 +587,7 @@ contract EdenAdminTest is EdenVestTestBase {
     function test_MultisigSignerRole() public view {
         bytes32 expectedRole = keccak256("MULTISIG_SIGNER_ROLE");
         assertEq(edenAdmin.MULTISIG_SIGNER_ROLE(), expectedRole, "Multisig signer role hash mismatch");
-        
+
         assertTrue(edenAdmin.hasRole(expectedRole, multisigSigners[0]), "Should have multisig signer role");
         assertFalse(edenAdmin.hasRole(expectedRole, user1), "Should not have multisig signer role");
     }

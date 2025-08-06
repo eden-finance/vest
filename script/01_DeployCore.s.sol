@@ -94,12 +94,12 @@ contract DeployCoreScript is Script {
         address admin = vm.envAddress("ADMIN_ADDRESS");
 
         return DeploymentConfig({
-            cNGN: vm.envOr("CNGN_ADDRESS", address(0x1234567890123456789012345678901234567890)),
+            cNGN: vm.envOr("CNGN_ADDRESS", address(0x5CDDBeBAc2260CF00654887184d6BA31096fE0a5)),
             treasury: vm.envOr("TREASURY_ADDRESS", admin),
             admin: admin,
-            globalTaxRate: 250, // 2.5%
-            uniswapRouter: vm.envOr("UNISWAP_ROUTER", address(0x2234567890123456789012345678901234567890)),
-            uniswapQuoter: vm.envOr("UNISWAP_QUOTER", address(0x3234567890123456789012345678901234567890))
+            globalTaxRate: 250,
+            uniswapRouter: vm.envOr("UNISWAP_ROUTER", address(0x365C8Bd36a27128A230B1CE8f7027d7a9e5A8f82)),
+            uniswapQuoter: vm.envOr("UNISWAP_QUOTER", address(0x740aC3204dB2AA93cd7D5a320e8374Ef63d24dbf))
         });
     }
 

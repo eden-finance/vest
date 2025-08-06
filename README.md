@@ -291,6 +291,7 @@ forge test -vvvv
 
 # Generate coverage report
 forge coverage --report lcov
+
 ```
 
 ### Test Categories
@@ -316,6 +317,17 @@ forge script --chain 42421 script/EdenCore.s.sol:DeployEdenCoreScript --rpc-url 
 # Deploy with mock tokens
 forge script --chain 42421 script/EdenVest.s.sol:DeployScript --rpc-url $TESTNET_RPC --broadcast --private-key $PRIVATE_KEY --gas-limit 60000000
 ```
+
+### Create a pool
+
+```bash
+source .env && forge script script/04b_CreatePool.s.sol:CreatePool \
+  --broadcast \
+  --rpc-url $RPC_URL \
+  --private-key $PRIVATE_KEY \
+  --legacy \
+  --gas-limit 6000000
+  ```
 
 ## 📡 API Reference
 

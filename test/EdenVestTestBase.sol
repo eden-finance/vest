@@ -10,7 +10,6 @@ import "../src/vest/TaxCollector.sol";
 import "../src/vest/SwapRouter.sol";
 import "../src/vest/NFTPositionManager.sol";
 
-
 import "../src/EdenPoolNFT.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./mocks/MockERC20.sol";
@@ -71,7 +70,7 @@ contract EdenVestTestBase is Test {
         edenCore = new EdenVestCore();
         edenCore.initialize(address(cNGN), treasury, admin, 250); // 2.5% tax
 
-        taxCollector = new TaxCollector(treasury, admin,address(edenCore));
+        taxCollector = new TaxCollector(treasury, admin, address(edenCore));
 
         // Setup EdenCore dependencies
         vm.startPrank(admin);
@@ -83,7 +82,6 @@ contract EdenVestTestBase is Test {
         // Setup PoolFactory dependencies
         poolFactory.setEdenCore(address(edenCore));
         poolFactory.setNFTManager(address(nftManager));
-      
 
         // Setup default pool parameters
         defaultPoolParams = IPoolFactory.PoolParams({
@@ -101,11 +99,11 @@ contract EdenVestTestBase is Test {
             taxRate: 0
         });
 
-         LPToken lptoken  = new LPToken();
-         poolFactory.updateLPTokenImplementation(address(lptoken));
+        LPToken lptoken = new LPToken();
+        poolFactory.updateLPTokenImplementation(address(lptoken));
 
-         InvestmentPool investmentPool  = new InvestmentPool();
-         poolFactory.updatePoolImplementation(address(investmentPool));
+        InvestmentPool investmentPool = new InvestmentPool();
+        poolFactory.updatePoolImplementation(address(investmentPool));
 
         vm.stopPrank();
         // Fund test accounts

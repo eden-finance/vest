@@ -30,7 +30,7 @@ contract DeployFaucetScript is Script {
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
-        
+
         vm.startBroadcast(deployerPrivateKey);
 
         console.log("=== EdenVest Faucet Deployment ===");
@@ -45,41 +45,47 @@ contract DeployFaucetScript is Script {
 
         // Step 2: Deploy tokens through the faucet
         console.log("\n Deploying tokens through faucet...");
-        
+
         // Deploy cNGN
-        cNGN = deployToken(TokenConfig({
-            name: "Compliant Nigerian Naira",
-            symbol: "cNGN",
-            decimals: 18,
-            initialSupply: 1_000_000_000, // 1 billion
-            faucetAmount: 10_000 * 1e18, // 10,000 tokens
-            cooldown: 2 hours,
-            dailyLimit: 3
-        }));
+        cNGN = deployToken(
+            TokenConfig({
+                name: "Compliant Nigerian Naira",
+                symbol: "cNGN",
+                decimals: 18,
+                initialSupply: 1_000_000_000, // 1 billion
+                faucetAmount: 10_000 * 1e18, // 10,000 tokens
+                cooldown: 2 hours,
+                dailyLimit: 3
+            })
+        );
         console.log(" cNGN deployed at:", cNGN);
 
         // Deploy USDC
-        USDC = deployToken(TokenConfig({
-            name: "USD Coin",
-            symbol: "USDC",
-            decimals: 18,
-            initialSupply: 1_000_000_000, // 1 billion
-            faucetAmount: 10_000 * 1e18, // 10,000 tokens
-            cooldown: 2 hours,
-            dailyLimit: 3
-        }));
+        USDC = deployToken(
+            TokenConfig({
+                name: "USD Coin",
+                symbol: "USDC",
+                decimals: 18,
+                initialSupply: 1_000_000_000, // 1 billion
+                faucetAmount: 10_000 * 1e18, // 10,000 tokens
+                cooldown: 2 hours,
+                dailyLimit: 3
+            })
+        );
         console.log(" USDC deployed at:", USDC);
 
         // Deploy USDT
-        USDT = deployToken(TokenConfig({
-            name: "Tether USD",
-            symbol: "USDT",
-            decimals: 18,
-            initialSupply: 1_000_000_000, // 1 billion
-            faucetAmount: 10_000 * 1e18, // 10,000 tokens
-            cooldown: 2 hours,
-            dailyLimit: 3
-        }));
+        USDT = deployToken(
+            TokenConfig({
+                name: "Tether USD",
+                symbol: "USDT",
+                decimals: 18,
+                initialSupply: 1_000_000_000, // 1 billion
+                faucetAmount: 10_000 * 1e18, // 10,000 tokens
+                cooldown: 2 hours,
+                dailyLimit: 3
+            })
+        );
         console.log(" USDT deployed at:", USDT);
 
         // Step 3: Configure native token faucet
@@ -113,7 +119,7 @@ contract DeployFaucetScript is Script {
 
     function deployToken(TokenConfig memory config) internal returns (address) {
         console.log(string.concat("  Deploying ", config.symbol, "..."));
-        
+
         address tokenAddress = EdenVestFaucet(faucet).deployToken(
             config.name,
             config.symbol,
@@ -123,23 +129,23 @@ contract DeployFaucetScript is Script {
             config.cooldown,
             config.dailyLimit
         );
-        
+
         console.log(string.concat("  ", config.symbol, " configuration:"));
         console.log("    - Initial Supply:", config.initialSupply);
         console.log("    - Faucet Amount:", config.faucetAmount / 1e18);
         console.log("    - Cooldown:", config.cooldown / 3600, "hours");
         console.log("    - Daily Limit:", config.dailyLimit);
-        
+
         return tokenAddress;
     }
 
     function configureNativeFaucet() internal {
         // Configure native token with reasonable limits
         EdenVestFaucet(faucet).configureNative(
-            0.1 ether,     // 0.1 native tokens per claim
-            2 hours,       // 2 hour cooldown
-            3,             // 3 claims per day
-            true           // enabled
+            0.1 ether, // 0.1 native tokens per claim
+            2 hours, // 2 hour cooldown
+            3, // 3 claims per day
+            true // enabled
         );
         console.log(" Native token faucet configured");
         console.log("  - Amount: 0.1 native tokens");
@@ -149,7 +155,7 @@ contract DeployFaucetScript is Script {
 
     function fundFaucetWithNative() internal {
         uint256 fundingAmount = vm.envOr("FAUCET_NATIVE_FUNDING", uint256(1 ether));
-        
+
         if (address(faucet).balance < fundingAmount) {
             (bool success,) = faucet.call{value: fundingAmount}("");
             require(success, "Failed to fund faucet with native tokens");
@@ -164,11 +170,11 @@ contract DeployFaucetScript is Script {
         if (admin == address(0)) {
             admin = vm.addr(vm.envUint("PRIVATE_KEY"));
         }
-        
+
         // Add admin to whitelist
         EdenVestFaucet(faucet).addToWhitelist(admin);
         console.log(" Added admin to whitelist:", admin);
-        
+
         // Add additional addresses if provided
         address[] memory additionalAddresses = getAdditionalWhitelistAddresses();
         if (additionalAddresses.length > 0) {
@@ -180,11 +186,11 @@ contract DeployFaucetScript is Script {
     function getAdditionalWhitelistAddresses() internal view returns (address[] memory) {
         // You can add more addresses here or read from environment
         string memory whitelist = vm.envOr("FAUCET_WHITELIST", string(""));
-        
+
         if (bytes(whitelist).length == 0) {
             return new address[](0);
         }
-        
+
         // Parse comma-separated addresses (simplified - you may want more robust parsing)
         // For now, return empty array - implement parsing if needed
         return new address[](0);
@@ -192,15 +198,15 @@ contract DeployFaucetScript is Script {
 
     function saveDeploymentAddresses() internal {
         string memory json = "faucet_deployment";
-        
+
         vm.serializeAddress(json, "faucet", faucet);
         vm.serializeAddress(json, "cNGN", cNGN);
         vm.serializeAddress(json, "USDC", USDC);
         string memory output = vm.serializeAddress(json, "USDT", USDT);
-        
+
         string memory filename = string.concat("deployments/faucet_", vm.toString(block.chainid), ".json");
         vm.writeJson(output, filename);
-        
+
         console.log("\n Deployment addresses saved to:", filename);
     }
 
@@ -211,7 +217,7 @@ contract DeployFaucetScript is Script {
         console.log("  cNGN:", cNGN);
         console.log("  USDC:", USDC);
         console.log("  USDT:", USDT);
-        
+
         console.log("\n Token Balances in Faucet:");
         console.log("  cNGN:", IERC20(cNGN).balanceOf(faucet) / 1e18);
         console.log("  USDC:", IERC20(USDC).balanceOf(faucet) / 1e18);
@@ -222,62 +228,72 @@ contract DeployFaucetScript is Script {
     function printVerificationCommands() internal view {
         console.log("\n=== VERIFICATION COMMANDS ===");
         console.log("Save these commands to verify contracts on block explorer:\n");
-        
+
         // Get common environment variables
-         string memory rpcUrl = vm.envOr("RPC_URL", string("https://enugu-rpc.assetchain.org/"));
+        string memory rpcUrl = vm.envOr("RPC_URL", string("https://enugu-rpc.assetchain.org/"));
         string memory verifier = vm.envOr("VERIFIER", string("blockscout"));
         string memory verifierUrl = vm.envOr("VERIFIER_URL", string("https://scan-testnet.assetchain.org/api/"));
-        
-        
+
         // Faucet verification command
         console.log("# Verify Faucet Contract");
-        console.log(string.concat(
-            "forge verify-contract ",
-            "--rpc-url ", rpcUrl, " ",
-            "--verifier ", verifier, " ",
-            "--verifier-url ", verifierUrl, " ",
-            vm.toString(faucet), " ",
-            "src/faucet/EdenVestFaucet.sol:EdenVestFaucet"
-        ));
-        
+        console.log(
+            string.concat(
+                "forge verify-contract ",
+                "--rpc-url ",
+                rpcUrl,
+                " ",
+                "--verifier ",
+                verifier,
+                " ",
+                "--verifier-url ",
+                verifierUrl,
+                " ",
+                vm.toString(faucet),
+                " ",
+                "src/faucet/EdenVestFaucet.sol:EdenVestFaucet"
+            )
+        );
+
         // Token verification commands
         console.log("\n# Verify cNGN Token");
         console.log(generateTokenVerificationCommand(cNGN, "Compliant Nigerian Naira", "cNGN"));
-        
+
         console.log("\n# Verify USDC Token");
         console.log(generateTokenVerificationCommand(USDC, "USD Coin", "USDC"));
-        
+
         console.log("\n# Verify USDT Token");
         console.log(generateTokenVerificationCommand(USDT, "Tether USD", "USDT"));
     }
 
-    function generateTokenVerificationCommand(
-        address token,
-        string memory name,
-        string memory symbol
-    ) internal view returns (string memory) {
-      string memory rpcUrl = vm.envOr("RPC_URL", string("https://enugu-rpc.assetchain.org/"));
+    function generateTokenVerificationCommand(address token, string memory name, string memory symbol)
+        internal
+        view
+        returns (string memory)
+    {
+        string memory rpcUrl = vm.envOr("RPC_URL", string("https://enugu-rpc.assetchain.org/"));
         string memory verifier = vm.envOr("VERIFIER", string("blockscout"));
         string memory verifierUrl = vm.envOr("VERIFIER_URL", string("https://scan-testnet.assetchain.org/api/"));
-        
-        
+
         // Encode constructor arguments
         // constructor(string name, string symbol, uint8 decimals, uint256 initialSupply, address owner)
-        bytes memory constructorArgs = abi.encode(
-            name,
-            symbol,
-            uint8(18),
-            uint256(1_000_000_000),
-            faucet
-        );
-        
+        bytes memory constructorArgs = abi.encode(name, symbol, uint8(18), uint256(1_000_000_000), faucet);
+
         return string.concat(
             "forge verify-contract ",
-            "--rpc-url ", rpcUrl, " ",
-            "--verifier ", verifier, " ",
-            "--verifier-url ", verifierUrl, " ",
-            "--constructor-args ", vm.toString(constructorArgs), " ",
-            vm.toString(token), " ",
+            "--rpc-url ",
+            rpcUrl,
+            " ",
+            "--verifier ",
+            verifier,
+            " ",
+            "--verifier-url ",
+            verifierUrl,
+            " ",
+            "--constructor-args ",
+            vm.toString(constructorArgs),
+            " ",
+            vm.toString(token),
+            " ",
             "src/faucet/EdenVestFaucet.sol:FaucetToken"
         );
     }

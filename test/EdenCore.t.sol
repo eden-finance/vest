@@ -7,7 +7,6 @@ import "./EdenVestTestBase.sol";
 import "../src/vest/interfaces/IInvestmentPool.sol";
 import "../src/vest/EdenAdmin.sol";
 
-
 contract EdenCoreTest is EdenVestTestBase {
     address public pool;
     address public lpToken;
@@ -16,12 +15,12 @@ contract EdenCoreTest is EdenVestTestBase {
     function setUp() public override {
         super.setUp();
 
-        edenAdmin = new EdenAdmin(address(edenCore),admin,multisigSigners);
-       
+        edenAdmin = new EdenAdmin(address(edenCore), admin, multisigSigners);
+
         // Create a default pool
         vm.prank(admin);
         edenCore.setEdenAdmin(address(edenAdmin));
-        
+
         vm.prank(admin);
         pool = edenCore.createPool(defaultPoolParams);
         (,, address _lpToken,,) = edenCore.poolInfo(pool);
@@ -204,7 +203,7 @@ contract EdenCoreTest is EdenVestTestBase {
 
         vm.expectRevert(EdenVestCore.DeadlineExpired.selector);
         vm.warp(block.timestamp + 200);
-        edenCore.invest(pool, 10000e18, "Test Invest with deadline", block.timestamp-2);
+        edenCore.invest(pool, 10000e18, "Test Invest with deadline", block.timestamp - 2);
         vm.stopPrank();
     }
 
@@ -260,7 +259,6 @@ contract EdenCoreTest is EdenVestTestBase {
         vm.stopPrank();
     }
 
-
     // ============ Tax Collection Tests ============
 
     function test_TaxCollection_Success() public {
@@ -294,7 +292,7 @@ contract EdenCoreTest is EdenVestTestBase {
         assertEq(activePools.length, 1, "Active pool count mismatch");
         assertEq(activePools[0], pool2, "Active pool address mismatch");
     }
-    
+
     // ============ Admin Internal Functions Tests ============
 
     function test_SetGlobalTaxRateInternal_OnlyAdminContract() public {

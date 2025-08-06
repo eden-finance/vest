@@ -11,10 +11,9 @@ import "../src/vest/TaxCollector.sol";
 import "../src/vest/InvestmentPool.sol";
 import "../src/vest/LPToken.sol";
 
-
 /**
  * @title Final Configuration
- * @notice Batch 4: Configure all contracts to work together
+ * @notice Batch 4a: Configure all contracts to work together
  */
 contract ConfigureScript is Script {
     function run() external {

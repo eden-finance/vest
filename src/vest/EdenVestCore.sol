@@ -97,12 +97,7 @@ contract EdenVestCore is
         _;
     }
 
-    function initialize(
-        address _cNGN,
-        address _treasury,
-        address _admin,
-        uint256 _taxRate
-    ) public initializer {
+    function initialize(address _cNGN, address _treasury, address _admin, uint256 _taxRate) public initializer {
         __AccessControl_init();
         __Pausable_init();
         __UUPSUpgradeable_init();
@@ -190,6 +185,15 @@ contract EdenVestCore is
             createdAt: block.timestamp,
             isActive: true
         });
+    }
+
+    /**
+     * @notice Check cNGN allowance for a user to spend on EdenCore
+     * @param user The user address to check allowance for
+     * @return allowance The current allowance amount
+     */
+    function checkCNGNAllowance(address user) external view returns (uint256 allowance) {
+        return IERC20(cNGN).allowance(user, address(this));
     }
 
     function invest(address pool, uint256 amount, string memory title, uint256 deadline)
