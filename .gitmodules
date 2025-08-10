@@ -10,3 +10,6 @@
 [submodule "lib/BokkyPooBahsDateTimeLibrary"]
 	path = lib/BokkyPooBahsDateTimeLibrary
 	url = https://github.com/bokkypoobah/BokkyPooBahsDateTimeLibrary
+[submodule "lib/foundry-devops"]
+	path = lib/foundry-devops
+	url = https://github.com/chainaccelorg/foundry-devops
