@@ -27,7 +27,7 @@ contract EdenVestTestBase is Test {
     EdenVestCore public edenCore;
     PoolFactory public poolFactory;
     TaxCollector public taxCollector;
-    SwapRouter public swapRouter;
+    EdenSwapRouter public swapRouter;
     NFTPositionManager public nftManager;
     EdenPoolNFT public nftRenderer;
 
@@ -64,7 +64,7 @@ contract EdenVestTestBase is Test {
         // Mock Uniswap contracts for testing
         address mockUniswapRouter = address(0x100);
         address mockUniswapQuoter = address(0x101);
-        swapRouter = new SwapRouter(mockUniswapRouter, mockUniswapQuoter, admin);
+        swapRouter = new EdenSwapRouter(mockUniswapRouter, mockUniswapQuoter, admin);
 
         // Deploy and initialize EdenVestCore
         edenCore = new EdenVestCore();

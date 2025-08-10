@@ -254,7 +254,6 @@ contract DeployFaucetScript is Script {
             )
         );
 
-        // Token verification commands
         console.log("\n# Verify cNGN Token");
         console.log(generateTokenVerificationCommand(cNGN, "Compliant Nigerian Naira", "cNGN"));
 
@@ -274,8 +273,6 @@ contract DeployFaucetScript is Script {
         string memory verifier = vm.envOr("VERIFIER", string("blockscout"));
         string memory verifierUrl = vm.envOr("VERIFIER_URL", string("https://scan-testnet.assetchain.org/api/"));
 
-        // Encode constructor arguments
-        // constructor(string name, string symbol, uint8 decimals, uint256 initialSupply, address owner)
         bytes memory constructorArgs = abi.encode(name, symbol, uint8(18), uint256(1_000_000_000), faucet);
 
         return string.concat(

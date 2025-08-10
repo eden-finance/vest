@@ -37,17 +37,17 @@ contract CreatePool is Script {
         console.log("Number of Multisig Signers:", multisigSigners.length);
 
         IPoolFactory.PoolParams memory poolParams = IPoolFactory.PoolParams({
-            name: "Nigeria Money Market",
+            name: "Nigeria Money Market 2",
             symbol: "NMM",
             admin: vm.addr(deployerPrivateKey),
             cNGN: cNGN,
             poolMultisig: poolMultisig,
             multisigSigners: multisigSigners,
-            lockDuration: 30 days,
+            lockDuration: 7 days,
             minInvestment: 1000e18, // 1,000 cNGN
             maxInvestment: 1000000e18, // 1,000,000 cNGN
             utilizationCap: 10000000e18, // 10,000,000 cNGN
-            expectedRate: 2000, // 20% APY
+            expectedRate: 1000, // 20% APY
             taxRate: 0 // No pool-specific tax, use global
         });
 

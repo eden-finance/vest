@@ -2,11 +2,12 @@
 pragma solidity ^0.8.22;
 
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {    PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interfaces/IPoolFactory.sol";
 import "./interfaces/IInvestmentPool.sol";
 import "./interfaces/ITaxCollector.sol";
@@ -25,6 +26,8 @@ contract EdenVestCore is
     UUPSUpgradeable,
     ReentrancyGuardUpgradeable
 {
+    using SafeERC20 for IERC20;
+
     // ============ ROLES ============
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant POOL_CREATOR_ROLE = keccak256("POOL_CREATOR_ROLE");
@@ -67,6 +70,16 @@ contract EdenVestCore is
         string title;
     }
 
+    struct WithdrawAndSwapParams {
+        address pool;
+        uint256 tokenId;
+        uint256 lpTokenAmount;
+        address tokenOut;
+        uint256 minAmountOut;
+        uint256 deadline; // 0 means "no deadline"
+        uint256 maxSlippageBps; // 0 => default 100 bps; cap for sanity
+    }
+
     // ============ EVENTS ============
     event InvestmentMade(
         address indexed pool, address indexed investor, uint256 tokenId, uint256 amount, uint256 lpTokens
@@ -74,6 +87,14 @@ contract EdenVestCore is
     event TaxRateUpdated(uint256 oldRate, uint256 newRate);
     event TreasuryUpdated(address oldTreasury, address newTreasury);
     event EmergencyWithdraw(address token, uint256 amount, address treasury, string reason, address admin);
+    event WithdrawnAndSwapped(
+        address indexed pool,
+        address indexed investor,
+        uint256 indexed tokenId,
+        uint256 amountInCNGN,
+        address tokenOut,
+        uint256 amountOut
+    );
 
     // ============ ERRORS ============
     error InvalidPool();
@@ -90,11 +111,18 @@ contract EdenVestCore is
     error InvalidRate();
     error InvalidPoolName();
     error InsufficientBalance();
+    error MinAmountOutZero();
+    error InvalidSlippage();
+    error InvalidToken();
 
     // ============ MODIFIERS ============
     modifier onlyAdminContract() {
         require(msg.sender == edenAdmin, "Only EdenAdmin");
         _;
+    }
+
+    constructor(){
+        _disableInitializers();
     }
 
     function initialize(address _cNGN, address _treasury, address _admin, uint256 _taxRate) public initializer {
@@ -255,6 +283,58 @@ contract EdenVestCore is
         (tokenId, lpTokens,) = IInvestmentPool(params.pool).invest(msg.sender, amountOut, params.title);
 
         emit InvestmentMade(params.pool, msg.sender, tokenId, amountOut, lpTokens);
+    }
+
+    function withdrawAndSwap(WithdrawAndSwapParams calldata p)
+        external
+        whenNotPaused
+        nonReentrant
+        returns (uint256 amountOut)
+    {
+        address _pool = p.pool;
+        if (!isRegisteredPool[_pool]) revert InvalidPool();
+        if (p.tokenOut == address(0)) revert InvalidToken();
+        if (p.deadline != 0 && p.deadline < block.timestamp) revert DeadlineExpired();
+
+        address _lpToken = poolInfo[_pool].lpToken;
+        IERC20(_lpToken).safeTransferFrom(msg.sender, _pool, p.lpTokenAmount);
+
+        IERC20 _cngn = IERC20(cNGN);
+        uint256 cngnBefore = _cngn.balanceOf(address(this));
+        IInvestmentPool(_pool).withdraw(address(this), p.tokenId, p.lpTokenAmount);
+        uint256 amountInCNGN = _cngn.balanceOf(address(this)) - cngnBefore;
+        if (amountInCNGN == 0) revert InsufficientLiquidity();
+
+        if (p.tokenOut == cNGN) {
+            _cngn.safeTransfer(msg.sender, amountInCNGN);
+            emit WithdrawnAndSwapped(_pool, msg.sender, p.tokenId, amountInCNGN, cNGN, amountInCNGN);
+            return amountInCNGN;
+        }
+
+        if (p.minAmountOut == 0) revert MinAmountOutZero();
+
+        uint256 slippageBps = p.maxSlippageBps == 0 ? 100 : p.maxSlippageBps;
+        if (slippageBps > 300) revert InvalidSlippage();
+
+        uint256 expectedOut = swapRouter.getAmountOut(cNGN, p.tokenOut, amountInCNGN);
+        if (expectedOut == 0) revert InsufficientLiquidity();
+
+        uint256 adjustedMinOut = (expectedOut * (BASIS_POINTS - slippageBps)) / BASIS_POINTS;
+        uint256 effectiveMinOut = adjustedMinOut > p.minAmountOut ? adjustedMinOut : p.minAmountOut;
+
+        _cngn.forceApprove(address(swapRouter), amountInCNGN);
+
+        IERC20 _out = IERC20(p.tokenOut);
+        uint256 outBefore = _out.balanceOf(address(this));
+
+        swapRouter.swapExactTokensForTokens(cNGN, p.tokenOut, amountInCNGN, effectiveMinOut, p.deadline);
+
+        amountOut = _out.balanceOf(address(this)) - outBefore;
+        if (amountOut < effectiveMinOut) revert SwapFailed();
+
+        _out.safeTransfer(msg.sender, amountOut);
+
+        emit WithdrawnAndSwapped(_pool, msg.sender, p.tokenId, amountInCNGN, p.tokenOut, amountOut);
     }
 
     function withdraw(address pool, uint256 tokenId, uint256 lpTokenAmount)

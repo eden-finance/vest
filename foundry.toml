@@ -9,7 +9,9 @@ evm_version = "berlin"
 remappings = [
     "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
     "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+    "@bokkypoobah/BokkyPooBahsDateTimeLibrary/=lib/BokkyPooBahsDateTimeLibrary/",
     "@bokkypoobah/BokkyPooBahsDateTimeLibrary/=lib/BokkyPooBahsDateTimeLibrary/"
+
 
 ]
 optimizer = true

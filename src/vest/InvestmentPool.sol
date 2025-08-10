@@ -34,7 +34,7 @@ contract InvestmentPool is
 
     // ============ CONSTANTS ============
     uint256 public constant BASIS_POINTS = 10000;
-    uint256 public constant MIN_LOCK_DURATION = 7 days;
+    uint256 public constant MIN_LOCK_DURATION = 3 minutes;
     uint256 public constant MAX_LOCK_DURATION = 730 days; // 2 years
 
     // ============ STATE VARIABLES ============

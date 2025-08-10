@@ -9,7 +9,7 @@ import "../src/vest/EdenVestCore.sol";
 import "../src/vest/EdenAdmin.sol";
 
 // Proxy imports
-import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /**
  * @title Deploy Proxy & Admin

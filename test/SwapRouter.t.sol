@@ -14,7 +14,7 @@ import "./mocks/MockUniswapV3Quoter.sol";
 import "./mocks/MockERC20.sol";
 
 contract SwapRouterTest is EdenVestTestBase {
-    SwapRouter public swapRouterSecure;
+    EdenSwapRouter public swapRouterSecure;
     MockUniswapV3Router public mockRouter;
     MockUniswapV3Quoter public mockQuoter;
     MockERC20 public tokenA;
@@ -35,7 +35,7 @@ contract SwapRouterTest is EdenVestTestBase {
         mockQuoter = new MockUniswapV3Quoter();
 
         // Deploy secure SwapRouter
-        swapRouterSecure = new SwapRouter(address(mockRouter), address(mockQuoter), admin);
+        swapRouterSecure = new EdenSwapRouter(address(mockRouter), address(mockQuoter), admin);
 
         // Deploy test tokens
         tokenA = new MockERC20("Token A", "TKNA", 18);
@@ -60,7 +60,7 @@ contract SwapRouterTest is EdenVestTestBase {
     // ============ INITIALIZATION TESTS ============
 
     function test_Initialize_Success() public {
-        SwapRouter newRouter = new SwapRouter(address(mockRouter), address(mockQuoter), admin);
+        EdenSwapRouter newRouter = new EdenSwapRouter(address(mockRouter), address(mockQuoter), admin);
 
         assertEq(address(newRouter.uniswapRouter()), address(mockRouter), "Router not set correctly");
         assertEq(address(newRouter.quoter()), address(mockQuoter), "Quoter not set correctly");
@@ -70,18 +70,18 @@ contract SwapRouterTest is EdenVestTestBase {
     }
 
     function test_RevertWhen_InitializeWithZeroRouter() public {
-        vm.expectRevert(abi.encodeWithSelector(SwapRouter.InvalidAddress.selector, address(0)));
-        new SwapRouter(address(0), address(mockQuoter), admin);
+        vm.expectRevert(abi.encodeWithSelector(EdenSwapRouter.InvalidAddress.selector, address(0)));
+        new EdenSwapRouter(address(0), address(mockQuoter), admin);
     }
 
     function test_RevertWhen_InitializeWithZeroQuoter() public {
-        vm.expectRevert(abi.encodeWithSelector(SwapRouter.InvalidAddress.selector, address(0)));
-        new SwapRouter(address(mockRouter), address(0), admin);
+        vm.expectRevert(abi.encodeWithSelector(EdenSwapRouter.InvalidAddress.selector, address(0)));
+        new EdenSwapRouter(address(mockRouter), address(0), admin);
     }
 
     function test_RevertWhen_InitializeWithZeroOwner() public {
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableInvalidOwner.selector, address(0)));
-        new SwapRouter(address(mockRouter), address(mockQuoter), address(0));
+        new EdenSwapRouter(address(mockRouter), address(mockQuoter), address(0));
     }
 
     // ============ SWAP FUNCTIONALITY TESTS ============
@@ -148,15 +148,15 @@ contract SwapRouterTest is EdenVestTestBase {
         vm.startPrank(user1);
 
         // Test zero address tokenIn
-        vm.expectRevert(abi.encodeWithSelector(SwapRouter.InvalidAddress.selector, address(0)));
+        vm.expectRevert(abi.encodeWithSelector(EdenSwapRouter.InvalidAddress.selector, address(0)));
         swapRouterSecure.swapExactTokensForTokens(address(0), address(tokenB), amountIn, minAmountOut, deadline);
 
         // Test zero address tokenOut
-        vm.expectRevert(abi.encodeWithSelector(SwapRouter.InvalidAddress.selector, address(tokenA)));
+        vm.expectRevert(abi.encodeWithSelector(EdenSwapRouter.InvalidAddress.selector, address(tokenA)));
         swapRouterSecure.swapExactTokensForTokens(address(tokenA), address(0), amountIn, minAmountOut, deadline);
 
         // Test same token addresses
-        vm.expectRevert(abi.encodeWithSelector(SwapRouter.InvalidAddress.selector, address(tokenA)));
+        vm.expectRevert(abi.encodeWithSelector(EdenSwapRouter.InvalidAddress.selector, address(tokenA)));
         swapRouterSecure.swapExactTokensForTokens(address(tokenA), address(tokenA), amountIn, minAmountOut, deadline);
 
         vm.stopPrank();
@@ -174,7 +174,7 @@ contract SwapRouterTest is EdenVestTestBase {
         // Should revert due to slippage protection (10% > 3% max)
         vm.expectRevert(
             abi.encodeWithSelector(
-                SwapRouter.SlippageProtectionTooLow.selector,
+                EdenSwapRouter.SlippageProtectionTooLow.selector,
                 tooLowMinAmount,
                 (expectedOut * 97) / 100 // 3% max slippage
             )
@@ -194,7 +194,7 @@ contract SwapRouterTest is EdenVestTestBase {
         vm.startPrank(user1);
         tokenA.approve(address(swapRouterSecure), amountIn);
 
-        vm.expectRevert(SwapRouter.NoLiquidityAvailable.selector);
+        vm.expectRevert(EdenSwapRouter.NoLiquidityAvailable.selector);
         swapRouterSecure.swapExactTokensForTokens(address(tokenA), address(tokenB), amountIn, minAmountOut, deadline);
         vm.stopPrank();
     }
@@ -220,7 +220,7 @@ contract SwapRouterTest is EdenVestTestBase {
         swapRouterSecure.getAmountOut(address(tokenA), address(tokenB), amountIn);
 
         // Second quote immediately should fail due to rate limit
-        vm.expectRevert(abi.encodeWithSelector(SwapRouter.RateLimitExceeded.selector, 1));
+        vm.expectRevert(abi.encodeWithSelector(EdenSwapRouter.RateLimitExceeded.selector, 1));
         swapRouterSecure.getAmountOut(address(tokenA), address(tokenB), amountIn);
 
         // After waiting, should succeed again
@@ -266,7 +266,7 @@ contract SwapRouterTest is EdenVestTestBase {
         uint24 invalidFee = 1234;
 
         vm.prank(admin);
-        vm.expectRevert(abi.encodeWithSelector(SwapRouter.InvalidFee.selector, invalidFee));
+        vm.expectRevert(abi.encodeWithSelector(EdenSwapRouter.InvalidFee.selector, invalidFee));
         swapRouterSecure.setPoolFee(address(tokenA), address(tokenB), invalidFee);
     }
 
@@ -300,7 +300,7 @@ contract SwapRouterTest is EdenVestTestBase {
         uint256 tooHighSlippage = 500; // 5% > 3% max
 
         vm.prank(admin);
-        vm.expectRevert(abi.encodeWithSelector(SwapRouter.InvalidSlippageValue.selector, tooHighSlippage));
+        vm.expectRevert(abi.encodeWithSelector(EdenSwapRouter.InvalidSlippageValue.selector, tooHighSlippage));
         swapRouterSecure.setMaxSlippage(tooHighSlippage);
     }
 
@@ -384,7 +384,7 @@ contract SwapRouterTest is EdenVestTestBase {
 
     function test_RevertWhen_EmergencyRecoveryToZeroAddress() public {
         vm.prank(admin);
-        vm.expectRevert(abi.encodeWithSelector(SwapRouter.InvalidAddress.selector, address(0)));
+        vm.expectRevert(abi.encodeWithSelector(EdenSwapRouter.InvalidAddress.selector, address(0)));
         swapRouterSecure.emergencyTokenRecovery(address(tokenA), 1000e18, address(0));
     }
 

@@ -69,7 +69,6 @@ contract NFTPositionManager is ERC721, ERC721Enumerable, AccessControl, INFTPosi
         _requireOwned(tokenId);
         Position memory position = positions[tokenId];
 
-        // Simplified rendering params for new architecture
         EdenPoolNFTRenderer.RenderParams memory params = EdenPoolNFTRenderer.RenderParams({
             tokenId: tokenId,
             investor: position.investor,

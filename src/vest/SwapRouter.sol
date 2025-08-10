@@ -39,11 +39,11 @@ interface IUniswapV3QuoterV2 {
 }
 
 /**
- * @title SwapRouter
+ * @title EdenSwapRouter
  * @notice Secure token swap router with comprehensive protection mechanisms
  * @dev Integrates with Uniswap V3 while providing additional security and validation layers
  */
-contract SwapRouter is IEdenSwapRouter.ISwapRouter, Ownable, ReentrancyGuard, Pausable {
+contract EdenSwapRouter is IEdenSwapRouter.ISwapRouter, Ownable, ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;
 
     // ============ CONSTANTS ============
@@ -59,7 +59,7 @@ contract SwapRouter is IEdenSwapRouter.ISwapRouter, Ownable, ReentrancyGuard, Pa
 
     // ============ STATE VARIABLES ============
     uint24 public defaultPoolFee = 3000; // 0.3%
-    uint256 public maxSlippageBasisPoints = 300; // 10% max slippage
+    uint256 public maxSlippageBasisPoints = 300; // 3% max slippage
     uint256 public quoteRateLimit = 1; // 1 second between quotes per address
 
     // ============ MAPPINGS ============

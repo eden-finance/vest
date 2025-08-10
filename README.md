@@ -290,7 +290,7 @@ forge test --match-contract EdenCoreTest
 forge test -vvvv
 
 # Generate coverage report
-forge coverage --report lcov
+forge test -vvvv --gas-limit 60000000 --match-path test/Univ3Router_Integration.t.sol
 
 ```
 
@@ -316,6 +316,12 @@ forge script --chain 42421 script/EdenCore.s.sol:DeployEdenCoreScript --rpc-url 
 ```bash
 # Deploy with mock tokens
 forge script --chain 42421 script/EdenVest.s.sol:DeployScript --rpc-url $TESTNET_RPC --broadcast --private-key $PRIVATE_KEY --gas-limit 60000000
+```
+
+### Upgrade
+
+```bash
+forge script --chain 42421 script/upgrades/01_EdenCore.s.sol:UpgradeEdenVestCoreScript --rpc-url $RPC_URL --broadcast --private-key $PRIVATE_KEY --gas-limit 60000000 -vvvv
 ```
 
 ### Create a pool

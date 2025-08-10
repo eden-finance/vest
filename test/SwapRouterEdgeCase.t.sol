@@ -13,7 +13,7 @@ import "./mocks/MockERC20.sol";
 import "../src/vest/SwapRouter.sol";
 
 contract SwapRouterEdgeCasesTest is EdenVestTestBase {
-    SwapRouter public swapRouterSecure;
+    EdenSwapRouter public swapRouterSecure;
     MockUniswapV3Router public mockRouter;
     MockUniswapV3Quoter public mockQuoter;
     MockERC20 public tokenA;
@@ -26,7 +26,7 @@ contract SwapRouterEdgeCasesTest is EdenVestTestBase {
         mockRouter = new MockUniswapV3Router();
         mockQuoter = new MockUniswapV3Quoter();
 
-        swapRouterSecure = new SwapRouter(address(mockRouter), address(mockQuoter), admin);
+        swapRouterSecure = new EdenSwapRouter(address(mockRouter), address(mockQuoter), admin);
 
         tokenA = new MockERC20("Token A", "TKNA", 18);
         tokenB = new MockERC20("Token B", "TKNB", 18);
@@ -480,7 +480,7 @@ contract SwapRouterEdgeCasesTest is EdenVestTestBase {
 // ============ INVARIANT TESTS ============
 
 contract SwapRouterInvariantTest is Test {
-    SwapRouter public swapRouter;
+    EdenSwapRouter public swapRouter;
     MockUniswapV3Router public mockRouter;
     MockUniswapV3Quoter public mockQuoter;
     MockERC20 public tokenA;
@@ -506,7 +506,7 @@ contract SwapRouterInvariantTest is Test {
         mockRouter = new MockUniswapV3Router();
         mockQuoter = new MockUniswapV3Quoter();
 
-        swapRouter = new SwapRouter(address(mockRouter), address(mockQuoter), admin);
+        swapRouter = new EdenSwapRouter(address(mockRouter), address(mockQuoter), admin);
 
         tokenA = new MockERC20("Token A", "TKNA", 18);
         tokenB = new MockERC20("Token B", "TKNB", 18);
@@ -683,7 +683,7 @@ contract SwapRouterInvariantTest is Test {
 // ============ PROPERTY-BASED TESTING ============
 
 contract SwapRouterPropertyTest is Test {
-    SwapRouter public swapRouter;
+    EdenSwapRouter public swapRouter;
     MockUniswapV3Router public mockRouter;
     MockUniswapV3Quoter public mockQuoter;
     MockERC20 public tokenA;
@@ -696,7 +696,7 @@ contract SwapRouterPropertyTest is Test {
         mockRouter = new MockUniswapV3Router();
         mockQuoter = new MockUniswapV3Quoter();
 
-        swapRouter = new SwapRouter(address(mockRouter), address(mockQuoter), admin);
+        swapRouter = new EdenSwapRouter(address(mockRouter), address(mockQuoter), admin);
 
         tokenA = new MockERC20("Token A", "TKNA", 18);
         tokenB = new MockERC20("Token B", "TKNB", 18);
@@ -854,7 +854,7 @@ contract SwapRouterPropertyTest is Test {
 // ============ STRESS TESTING ============
 
 contract SwapRouterStressTest is Test {
-    SwapRouter public swapRouter;
+    EdenSwapRouter public swapRouter;
     MockUniswapV3Router public mockRouter;
     MockUniswapV3Quoter public mockQuoter;
     MockERC20 public tokenA;
@@ -867,7 +867,7 @@ contract SwapRouterStressTest is Test {
         mockRouter = new MockUniswapV3Router();
         mockQuoter = new MockUniswapV3Quoter();
 
-        swapRouter = new SwapRouter(address(mockRouter), address(mockQuoter), admin);
+        swapRouter = new EdenSwapRouter(address(mockRouter), address(mockQuoter), admin);
 
         tokenA = new MockERC20("Token A", "TKNA", 18);
         tokenB = new MockERC20("Token B", "TKNB", 18);

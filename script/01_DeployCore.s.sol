@@ -4,14 +4,11 @@ pragma solidity ^0.8.22;
 import "forge-std/Script.sol";
 import "forge-std/console.sol";
 
-// Core Contracts
 import "../src/vest/EdenVestCore.sol";
 import "../src/vest/TaxCollector.sol";
 import "../src/vest/SwapRouter.sol";
 import "../src/EdenPoolNFT.sol";
 
-// Proxy imports
-import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /**
  * @title Deploy Core Infrastructure
@@ -77,9 +74,9 @@ contract DeployCoreScript is Script {
     }
 
     function _deploySwapRouter(DeploymentConfig memory config) internal returns (address) {
-        console.log("Deploying SwapRouter...");
-        SwapRouter swapRouter = new SwapRouter(config.uniswapRouter, config.uniswapQuoter, config.admin);
-        console.log(" SwapRouter deployed");
+        console.log("Deploying EdenSwapRouter...");
+        EdenSwapRouter swapRouter = new EdenSwapRouter(config.uniswapRouter, config.uniswapQuoter, config.admin);
+        console.log(" EdenSwapRouter deployed");
         return address(swapRouter);
     }
 
@@ -104,7 +101,7 @@ contract DeployCoreScript is Script {
     }
 
     function _saveAddresses(address nftRenderer, address taxCollector, address swapRouter, address edenCoreImpl)
-        internal
+        internal pure
     {
         // Save to a simple format that can be read by next scripts
         console.log("\n=== SAVE THESE ADDRESSES FOR NEXT BATCH ===");
