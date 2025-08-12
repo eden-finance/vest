@@ -54,7 +54,7 @@ forge verify-contract \
   --verifier $VERIFIER \
   --verifier-url $VERIFIER_URL \
   --constructor-args $constructor_swap \
-  $SWAP_ROUTER src/vest/SwapRouter.sol:SwapRouter || echo "⚠️ SwapRouter already verified or failed"
+  $SWAP_ROUTER src/vest/SwapRouter.sol:EdenSwapRouter || echo "⚠️ EdenSwapRouter already verified or failed"
 
 # ✅ EdenCore Impl - No constructor args
 forge verify-contract \

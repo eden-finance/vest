@@ -32,12 +32,16 @@ contract NFTPositionManager is ERC721, ERC721Enumerable, AccessControl, INFTPosi
         _grantRole(MINTER_ROLE, _admin);
     }
 
-    function mintPosition(address investor, address pool, uint256 investmentId, uint256 amount, uint256 maturityTime)
-        external
-        override
-        onlyAuthorizedPool
-        returns (uint256 tokenId)
-    {
+    function mintPosition(
+        address investor,
+        address pool,
+        uint256 investmentId,
+        uint256 amount,
+        uint256 maturityTime,
+        uint256 expectedReturn,
+        uint256 apy,
+        uint256 createdAt
+    ) external override onlyAuthorizedPool returns (uint256 tokenId) {
         tokenId = nextTokenId++;
 
         positions[tokenId] = Position({
@@ -45,7 +49,12 @@ contract NFTPositionManager is ERC721, ERC721Enumerable, AccessControl, INFTPosi
             investmentId: investmentId,
             amount: amount,
             investor: investor,
-            maturityTime: maturityTime
+            maturityTime: maturityTime,
+            expectedReturn: expectedReturn,
+            apy: apy,
+            actualReturn: 0,
+            fundsCollected: 0,
+            createdAt: createdAt
         });
 
         _mint(investor, tokenId);
@@ -68,20 +77,25 @@ contract NFTPositionManager is ERC721, ERC721Enumerable, AccessControl, INFTPosi
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
         _requireOwned(tokenId);
         Position memory position = positions[tokenId];
+        bool fundsCollected;
+
+        if (position.actualReturn > 0) {
+            fundsCollected = true;
+        }
 
         EdenPoolNFTRenderer.RenderParams memory params = EdenPoolNFTRenderer.RenderParams({
             tokenId: tokenId,
             investor: position.investor,
             amount: position.amount,
-            depositTime: block.timestamp,
+            depositTime: position.createdAt,
             maturityTime: position.maturityTime,
-            expectedReturn: 0,
-            actualReturn: 0,
-            isMatured: block.timestamp >= position.maturityTime,
+            expectedReturn: position.expectedReturn,
+            actualReturn: position.actualReturn,
+            isMatured: position.maturityTime >= position.createdAt,
             isWithdrawn: false,
-            fundsCollected: true,
+            fundsCollected: fundsCollected,
             lockDuration: position.maturityTime - block.timestamp,
-            expectedRate: 1500 // Default 15% for display
+            expectedRate: position.apy
         });
 
         return renderer.renderNFT(params);

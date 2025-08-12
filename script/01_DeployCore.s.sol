@@ -9,7 +9,6 @@ import "../src/vest/TaxCollector.sol";
 import "../src/vest/SwapRouter.sol";
 import "../src/EdenPoolNFT.sol";
 
-
 /**
  * @title Deploy Core Infrastructure
  * @notice Batch 1: Deploy lightweight core contracts
@@ -101,7 +100,8 @@ contract DeployCoreScript is Script {
     }
 
     function _saveAddresses(address nftRenderer, address taxCollector, address swapRouter, address edenCoreImpl)
-        internal pure
+        internal
+        pure
     {
         // Save to a simple format that can be read by next scripts
         console.log("\n=== SAVE THESE ADDRESSES FOR NEXT BATCH ===");

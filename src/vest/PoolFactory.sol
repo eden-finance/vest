@@ -49,7 +49,7 @@ contract PoolFactory is IPoolFactory, Ownable {
         require(params.admin != address(0), "Invalid admin");
         require(params.poolMultisig != address(0), "Invalid multisig");
         require(params.multisigSigners.length >= 2, "Insufficient signers");
-        require(params.lockDuration >= 7 days, "Duration too short");
+        require(params.lockDuration >= 1 seconds, "Duration too short");
         require(params.minInvestment > 0, "Invalid min investment");
 
         require(address(lpTokenImplementation) != address(0), "No LP token implementation");

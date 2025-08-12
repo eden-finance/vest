@@ -13,6 +13,7 @@ interface IQuoterV2 {
         uint24 fee;
         uint160 sqrtPriceLimitX96;
     }
+
     function quoteExactInputSingle(QuoteExactInputSingleParams memory params)
         external
         returns (uint256 amountOut, uint160, uint32, uint256);
@@ -21,10 +22,10 @@ interface IQuoterV2 {
 contract EdenSwapRouter_Integration is Test {
     // ===== Real deployed addresses on AssetChain =====
     address constant EDEN_SWAP_ROUTER = 0xAFb6ADa8C5b66eE46f475faD31Add0D5BCC5A745; // EdenSwapRouter
-    address constant CNGN             = 0x5CDDBeBAc2260CF00654887184d6BA31096fE0a5; // cNGN
-    address constant USDT             = 0x68dB7c3D77dbB0eD20DAE20CF5c8e6f215BA76FB; // USDT
-    address constant QUOTER_V2        = 0x740aC3204dB2AA93cd7D5a320e8374Ef63d24dbf; // Uniswap V3 QuoterV2
-    address constant CNGN_WHALE       = 0x54527B09Aeb2Be23F99958Db8f2f827daB863A28; // funded cNGN whale
+    address constant CNGN = 0x5CDDBeBAc2260CF00654887184d6BA31096fE0a5; // cNGN
+    address constant USDT = 0x68dB7c3D77dbB0eD20DAE20CF5c8e6f215BA76FB; // USDT
+    address constant QUOTER_V2 = 0x740aC3204dB2AA93cd7D5a320e8374Ef63d24dbf; // Uniswap V3 QuoterV2
+    address constant CNGN_WHALE = 0x54527B09Aeb2Be23F99958Db8f2f827daB863A28; // funded cNGN whale
 
     uint24 constant FEE_3000 = 3000;
 
@@ -74,13 +75,7 @@ contract EdenSwapRouter_Integration is Test {
         uint256 beforeUsdt = IERC20(USDT).balanceOf(user);
 
         // 4️⃣ Execute swap on deployed EdenSwapRouter
-        uint256 outAmt = router.swapExactTokensForTokens(
-            CNGN,
-            USDT,
-            amountIn,
-            minOut,
-            block.timestamp + 1200
-        );
+        uint256 outAmt = router.swapExactTokensForTokens(CNGN, USDT, amountIn, minOut, block.timestamp + 1200);
 
         // 5️⃣ Capture balances after
         uint256 afterCngn = IERC20(CNGN).balanceOf(user);

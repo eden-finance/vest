@@ -3,7 +3,7 @@ pragma solidity ^0.8.22;
 
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {    PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -121,7 +121,7 @@ contract EdenVestCore is
         _;
     }
 
-    constructor(){
+    constructor() {
         _disableInitializers();
     }
 
@@ -197,7 +197,7 @@ contract EdenVestCore is
         if (poolParams.poolMultisig == address(0)) revert InvalidAddress();
         if (poolParams.minInvestment == 0) revert InvalidAmount();
         if (poolParams.maxInvestment < poolParams.minInvestment) revert InvalidAmount();
-        if (poolParams.lockDuration < 1 days) revert InvalidLockDuration();
+        if (poolParams.lockDuration < 1 seconds) revert InvalidLockDuration();
         if (poolParams.expectedRate > 10000) revert InvalidRate();
         if (poolParams.taxRate > MAX_TAX_RATE) revert InvalidTaxRate();
 

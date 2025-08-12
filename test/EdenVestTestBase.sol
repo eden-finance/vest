@@ -12,6 +12,7 @@ import "../src/vest/NFTPositionManager.sol";
 
 import "../src/EdenPoolNFT.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "./mocks/MockERC20.sol";
 
 // Mock contracts for testing
@@ -67,8 +68,13 @@ contract EdenVestTestBase is Test {
         swapRouter = new EdenSwapRouter(mockUniswapRouter, mockUniswapQuoter, admin);
 
         // Deploy and initialize EdenVestCore
-        edenCore = new EdenVestCore();
-        edenCore.initialize(address(cNGN), treasury, admin, 250); // 2.5% tax
+        EdenVestCore impl = new EdenVestCore();
+        bytes memory initData = abi.encodeCall(
+        EdenVestCore.initialize,
+        (address(cNGN), treasury, admin, 250));
+
+     ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
+    edenCore = EdenVestCore(address(proxy));
 
         taxCollector = new TaxCollector(treasury, admin, address(edenCore));
 

@@ -165,7 +165,8 @@ contract InvestmentPool is
             maturityTime: maturityTime,
             expectedReturn: expectedReturn,
             isWithdrawn: false,
-            lpTokens: userLPTokens
+            lpTokens: userLPTokens,
+            actualReturn: 0
         });
 
         userInvestments[investor].push(investmentId);
@@ -173,8 +174,16 @@ contract InvestmentPool is
         ILPToken(lpToken).mint(investor, userLPTokens);
         ILPToken(lpToken).mint(taxCollector, taxAmount);
 
-        tokenId =
-            INFTPositionManager(nftManager).mintPosition(investor, address(this), investmentId, amount, maturityTime);
+        tokenId = INFTPositionManager(nftManager).mintPosition(
+            investor,
+            address(this),
+            investmentId,
+            amount,
+            maturityTime,
+            expectedReturn,
+            poolConfig.expectedRate,
+            block.timestamp
+        );
 
         nftToInvestment[tokenId] = investmentId;
 
@@ -213,7 +222,9 @@ contract InvestmentPool is
 
         investment.isWithdrawn = true;
 
-        withdrawAmount += investment.expectedReturn;
+        uint256 expectedInterest = _calculateExpectedReturn(investment.amount);
+
+        withdrawAmount += investment.amount + expectedInterest;
 
         require(IERC20(lpToken).balanceOf(address(this)) >= requiredLPTokens, "LP tokens not received");
 

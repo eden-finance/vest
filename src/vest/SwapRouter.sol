@@ -8,7 +8,6 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import "./interfaces/ISwapRouter.sol" as IEdenSwapRouter;
 
-// Uniswap V3 Interface definitions
 interface IUniswapV3SwapRouter {
     struct ExactInputSingleParams {
         address tokenIn;
@@ -107,7 +106,6 @@ contract EdenSwapRouter is IEdenSwapRouter.ISwapRouter, Ownable, ReentrancyGuard
         _;
     }
 
-    //TODO: implement failed swap
     modifier notTooManyFailures(address tokenIn, address tokenOut) {
         if (block.timestamp >= lastFailureTime[tokenIn][tokenOut] + FAILURE_RESET_TIME) {
             failedSwapCount[tokenIn][tokenOut] = 0;
@@ -258,7 +256,7 @@ contract EdenSwapRouter is IEdenSwapRouter.ISwapRouter, Ownable, ReentrancyGuard
     }
 
     function setQuoteRateLimit(uint256 _rateLimit) external onlyOwner {
-        if (_rateLimit > 60) revert("Rate limit too high"); // Max 1 minute
+        if (_rateLimit > 60) revert("Rate limit too high");
 
         uint256 oldLimit = quoteRateLimit;
         quoteRateLimit = _rateLimit;
@@ -270,7 +268,7 @@ contract EdenSwapRouter is IEdenSwapRouter.ISwapRouter, Ownable, ReentrancyGuard
         delete poolFees[tokenA][tokenB];
         delete poolFees[tokenB][tokenA];
 
-        emit PoolFeeSet(tokenA, tokenB, 0); // 0 indicates removed/default
+        emit PoolFeeSet(tokenA, tokenB, 0);
     }
 
     function resetFailureCount(address tokenIn, address tokenOut) external onlyOwner {
@@ -298,7 +296,6 @@ contract EdenSwapRouter is IEdenSwapRouter.ISwapRouter, Ownable, ReentrancyGuard
     }
 
     function getFailureCount(address tokenIn, address tokenOut) external view returns (uint256) {
-        // Reset if enough time has passed
         if (block.timestamp >= lastFailureTime[tokenIn][tokenOut] + FAILURE_RESET_TIME) {
             return 0;
         }

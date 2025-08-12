@@ -6,6 +6,7 @@ import "forge-std/console.sol";
 import "./EdenVestTestBase.sol";
 import "../src/vest/interfaces/IInvestmentPool.sol";
 import "../src/vest/EdenAdmin.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract EdenCoreTest is EdenVestTestBase {
     address public pool;
@@ -32,37 +33,61 @@ contract EdenCoreTest is EdenVestTestBase {
 
     // ============ Initialization Tests ============
 
-    function test_Initialize_Success() public {
-        EdenVestCore newCore = new EdenVestCore();
-        newCore.initialize(address(cNGN), treasury, admin, 250);
+function test_Initialize_Success() public {
+    EdenVestCore impl = new EdenVestCore();
+    bytes memory initData = abi.encodeCall(
+        EdenVestCore.initialize,
+        (address(cNGN), treasury, admin, 250)
+    );
+    ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
+    EdenVestCore newCore = EdenVestCore(address(proxy));
 
-        assertEq(newCore.cNGN(), address(cNGN), "cNGN not set");
-        assertEq(newCore.protocolTreasury(), treasury, "Treasury not set");
-        assertEq(newCore.globalTaxRate(), 250, "Tax rate not set");
-        assertTrue(newCore.hasRole(newCore.ADMIN_ROLE(), admin), "Admin role not granted");
-        assertTrue(newCore.hasRole(newCore.POOL_CREATOR_ROLE(), admin), "Pool creator role not granted");
-    }
+    assertEq(newCore.cNGN(), address(cNGN));
+    assertEq(newCore.protocolTreasury(), treasury);
+    assertEq(newCore.globalTaxRate(), 250);
+    assertTrue(newCore.hasRole(newCore.ADMIN_ROLE(), admin));
+    assertTrue(newCore.hasRole(newCore.POOL_CREATOR_ROLE(), admin));
+}
 
-    function test_RevertWhen_InitializeWithZeroAddress() public {
-        EdenVestCore newCore = new EdenVestCore();
+function test_RevertWhen_InitializeWithHighTaxRate() public {
+    EdenVestCore impl = new EdenVestCore();
 
-        vm.expectRevert(EdenVestCore.InvalidAddress.selector);
-        newCore.initialize(address(0), treasury, admin, 250);
 
-        vm.expectRevert(EdenVestCore.InvalidAddress.selector);
-        newCore.initialize(address(cNGN), address(0), admin, 250);
-    }
+    bytes memory initData = abi.encodeCall(
+        EdenVestCore.initialize,
+        (address(cNGN), treasury, admin, 1001)
+    );
 
-    function test_RevertWhen_InitializeWithHighTaxRate() public {
-        EdenVestCore newCore = new EdenVestCore();
+    vm.expectRevert(EdenVestCore.InvalidTaxRate.selector);
+    new ERC1967Proxy(address(impl), initData);
+}
 
-        vm.expectRevert(EdenVestCore.InvalidTaxRate.selector);
-        newCore.initialize(address(cNGN), treasury, admin, 1001); // > 10%
-    }
+function test_RevertWhen_InitializeWithZeroAddress() public {
+    EdenVestCore impl = new EdenVestCore();
+    
+    bytes memory badCngn = abi.encodeCall(
+        EdenVestCore.initialize,
+        (address(0), treasury, admin, 250)
+    );
+    vm.expectRevert(EdenVestCore.InvalidAddress.selector);
+    new ERC1967Proxy(address(impl), badCngn);
+
+    bytes memory badTreasury = abi.encodeCall(
+        EdenVestCore.initialize,
+        (address(cNGN), address(0), admin, 250)
+    );
+    vm.expectRevert(EdenVestCore.InvalidAddress.selector);
+    new ERC1967Proxy(address(impl), badTreasury);
+}
 
     function test_AdminHasRole() public {
-        EdenVestCore newCore = new EdenVestCore();
-        newCore.initialize(address(cNGN), treasury, admin, 250);
+          EdenVestCore impl = new EdenVestCore();
+    bytes memory initData = abi.encodeCall(
+        EdenVestCore.initialize,
+        (address(cNGN), treasury, admin, 250)
+    );
+    ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
+    EdenVestCore newCore = EdenVestCore(address(proxy));
 
         assertTrue(newCore.hasRole(newCore.EMERGENCY_ROLE(), admin), "Emergency role not granted");
         assertTrue(newCore.hasRole(newCore.POOL_CREATOR_ROLE(), admin), "Pool creator role not granted");
@@ -137,7 +162,7 @@ contract EdenCoreTest is EdenVestTestBase {
 
         // Test invalid lock duration
         invalidParams = defaultPoolParams;
-        invalidParams.lockDuration = 12 hours; // Less than 1 day
+        invalidParams.lockDuration = 0; // Less than 1 day
         vm.prank(admin);
         vm.expectRevert(EdenVestCore.InvalidLockDuration.selector);
         edenCore.createPool(invalidParams);

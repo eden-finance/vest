@@ -62,8 +62,7 @@ contract DeployProxyScript is Script {
             config.cNGN,
             config.treasury,
             config.admin,
-            config.globalTaxRate,
-            config.multisigSigners
+            config.globalTaxRate
         );
 
         // Deploy proxy
@@ -98,7 +97,7 @@ contract DeployProxyScript is Script {
         });
     }
 
-    function _saveAddresses(address edenCoreProxy, address edenAdmin) internal {
+    function _saveAddresses(address edenCoreProxy, address edenAdmin) internal pure {
         console.log("\n=== BATCH 2 COMPLETE ===");
         console.log(string.concat("export EDEN_CORE_PROXY=", vm.toString(edenCoreProxy)));
         console.log(string.concat("export EDEN_ADMIN=", vm.toString(edenAdmin)));
