@@ -33,17 +33,17 @@ address[] memory multisigSigners = new address[](3);
         console.log("NFT Manager     :", nftManager);
 
         IPoolFactory.PoolParams memory poolParams = IPoolFactory.PoolParams({
-            name: "Nigeria Money Market",
-            symbol: "NMM",
+            name: "Chowdeck group of companies 2",
+            symbol: "CWD",
             admin: deployer,
             cNGN: cNGN,
             poolMultisig: poolMultisig,
             multisigSigners: multisigSigners,
-            lockDuration: 1 days,
-            minInvestment: 1000e18,
-            maxInvestment: 1_000_000e18,
-            utilizationCap: 10_000_000e18,
-            expectedRate: 1000, // 10% in bps
+            lockDuration: 40 minutes,
+            minInvestment: 10_000e18,
+            maxInvestment: 100_000e18,
+            utilizationCap: 1_000_000e18,
+            expectedRate: 5000, // 10% in bps
             taxRate: 0
         });
 

@@ -132,7 +132,7 @@ echo "✅ Batch 4 complete."
 
 echo "💾 Saving all deployment addresses..."
 
-cat <<EOF > .env.core
+cat <<EOF > .env.core.$CHAIN_ID
 NFT_RENDERER=$NFT_RENDERER
 TAX_COLLECTOR=$TAX_COLLECTOR
 SWAP_ROUTER=$SWAP_ROUTER
@@ -145,7 +145,7 @@ POOL_IMPLEMENTATION=$POOL_IMPLEMENTATION
 LP_TOKEN_IMPLEMENTATION=$LP_TOKEN_IMPLEMENTATION
 EOF
 
-cat <<EOF > deployments/core.json
+cat <<EOF > deployments/core.$CHAIN_ID.json
 {
   "NFT_RENDERER": "$NFT_RENDERER",
   "TAX_COLLECTOR": "$TAX_COLLECTOR",
@@ -166,8 +166,8 @@ EOF
 
 echo -e "\n🎉 EdenVest Deployment COMPLETE"
 echo "🔑 All addresses saved to:"
-echo "  → .env.core"
-echo "  → deployments/core.json"
+echo "  → .env.core.$CHAIN_ID"
+echo "  → deployments/core.$CHAIN_ID.json"
 
 echo -e "\n📌 Deployed Contracts:"
 echo "  - EdenCore Proxy:           $EDEN_CORE_PROXY"

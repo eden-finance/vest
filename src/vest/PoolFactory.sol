@@ -55,19 +55,16 @@ contract PoolFactory is IPoolFactory, Ownable {
         require(address(lpTokenImplementation) != address(0), "No LP token implementation");
         require(address(poolImplementation) != address(0), "No Pool implementation");
 
-        // Deploy LP token clone
         address lpToken = lpTokenImplementation.clone();
 
         // Initialize LP token
         string memory lpTokenName = string.concat("Eden ", params.name, " LP");
         string memory lpTokenSymbol = string.concat("e", params.symbol, "LP");
 
-        // Deploy pool clone
         pool = poolImplementation.clone();
 
         ILPToken(lpToken).initialize(lpTokenName, lpTokenSymbol, params.admin, pool);
 
-        // Prepare initialization parameters
         IInvestmentPool.InitParams memory initParams = IInvestmentPool.InitParams({
             name: params.name,
             lpToken: lpToken,
@@ -85,10 +82,7 @@ contract PoolFactory is IPoolFactory, Ownable {
             taxRate: params.taxRate
         });
 
-        // Initialize pool
         InvestmentPool(pool).initialize(initParams);
-
-        // Register pool
         isPool[pool] = true;
         allPools.push(pool);
 

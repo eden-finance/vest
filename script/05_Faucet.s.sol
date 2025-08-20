@@ -94,7 +94,7 @@ contract DeployFaucetScript is Script {
 
         // Step 4: Fund the faucet with native tokens
         console.log("\n Funding faucet with native tokens...");
-        fundFaucetWithNative();
+        // fundFaucetWithNative();
 
         // Step 5: Add initial whitelist (optional)
         console.log("\n Adding initial whitelist...");
