@@ -7,45 +7,39 @@ echo "🚀 EdenVest Faucet Deployment Starting..."
 # ───────────────────────────────────────────────
 # Load Environment Variables
 # ───────────────────────────────────────────────
-if [ -f .env ]; then
-  source .env
+if [ -f .env.base ]; then
+  source .env.base
 else
-  echo "❌ .env file not found!"
+  echo "❌ .env.base file not found!"
   exit 1
 fi
 
-# Check required variables
+
 required_vars=("CHAIN_ID" "RPC_URL" "PRIVATE_KEY" "ETHERSCAN_API_KEY")
 for var in "${required_vars[@]}"; do
   if [ -z "${!var}" ]; then
-    echo "❌ $var not set in .env"
+    echo "❌ $var not set in .env.base"
     exit 1
   fi
 done
 
-# Set defaults if not provided
+
 ADMIN_ADDRESS=${ADMIN_ADDRESS:-$(cast wallet address --private-key $PRIVATE_KEY)}
 FAUCET_NATIVE_FUNDING=${FAUCET_NATIVE_FUNDING:-"1"}
 
-# Define chain-specific configurations
+
 case $CHAIN_ID in
-  84532) # Base Sepolia
+  84532) #  Sepolia
     RPC_URL=${RPC_URL:-"https://sepolia.base.org"}
     VERIFIER=${VERIFIER:-"etherscan"}
     VERIFIER_URL=${VERIFIER_URL:-"https://api-sepolia.basescan.org/api"}
     EXPLORER_URL="https://sepolia.basescan.org"
     ;;
-  8453) # Base Mainnet
+  8453) #  Mainnet
     RPC_URL=${RPC_URL:-"https://mainnet.base.org"}
     VERIFIER=${VERIFIER:-"etherscan"}
     VERIFIER_URL=${VERIFIER_URL:-"https://api.basescan.org/api"}
     EXPLORER_URL="https://basescan.org"
-    ;;
-  42421) # Assetchain Testnet
-    RPC_URL=${RPC_URL:-"https://enugu-rpc.assetchain.org"}
-    VERIFIER=${VERIFIER:-"blockscout"}
-    VERIFIER_URL=${VERIFIER_URL:-"https://scan-testnet.assetchain.org/api"}
-    EXPLORER_URL="https://scan-testnet.assetchain.org"
     ;;
   *)
     echo "❌ Unsupported CHAIN_ID: $CHAIN_ID. Please configure RPC_URL, VERIFIER, VERIFIER_URL, and EXPLORER_URL."
@@ -53,26 +47,24 @@ case $CHAIN_ID in
     ;;
 esac
 
-# Create deployments directory
+
 mkdir -p deployments
 
-# ───────────────────────────────────────────────
-# Deploy Faucet and Tokens
-# ───────────────────────────────────────────────
+
 echo "📦 Deploying Faucet Contract and Tokens..."
 echo "  Chain: $CHAIN_ID"
 echo "  RPC: $RPC_URL"
 echo "  Admin: $ADMIN_ADDRESS"
 echo ""
 
-# Determine if --legacy is needed (Base networks support EIP-1559, Assetchain may require --legacy)
+
 if [[ "$CHAIN_ID" == "84532" || "$CHAIN_ID" == "8453" ]]; then
   LEGACY_FLAG=""
 else
   LEGACY_FLAG="--legacy"
 fi
 
-# Check deployer balance
+
 DEPLOYER_BALANCE=$(cast balance --rpc-url "$RPC_URL" "$ADMIN_ADDRESS")
 DEPLOYER_BALANCE_ETH=$(echo "$DEPLOYER_BALANCE / 1000000000000000000" | bc -l)
 
@@ -88,19 +80,17 @@ forge script script/05_Faucet.s.sol:DeployFaucetScript \
   --private-key "$PRIVATE_KEY" \
   -vvv | tee deployments/faucet_deployment_$CHAIN_ID.log
 
-# ───────────────────────────────────────────────
-# Extract Deployed Addresses
-# ───────────────────────────────────────────────
+
 echo ""
 echo "📝 Extracting deployed addresses..."
 
-# Parse addresses from deployment log
+
 FAUCET=$(grep "Faucet deployed at:" deployments/faucet_deployment_$CHAIN_ID.log | tail -1 | awk '{print $NF}')
 CNGN=$(grep "cNGN deployed at:" deployments/faucet_deployment_$CHAIN_ID.log | tail -1 | awk '{print $NF}')
 USDC=$(grep "USDC deployed at:" deployments/faucet_deployment_$CHAIN_ID.log | tail -1 | awk '{print $NF}')
 USDT=$(grep "USDT deployed at:" deployments/faucet_deployment_$CHAIN_ID.log | tail -1 | awk '{print $NF}')
 
-# Validate addresses were extracted
+
 if [[ -z "$FAUCET" || -z "$CNGN" || -z "$USDC" || -z "$USDT" ]]; then
   echo "❌ Failed to extract addresses from deployment log"
   echo "  FAUCET: $FAUCET"
@@ -117,14 +107,11 @@ echo "  USDC: $USDC"
 echo "  USDT: $USDT"
 
 
-# ───────────────────────────────────────────────
-# Save Addresses to Files
-# ───────────────────────────────────────────────
 echo ""
 echo "💾 Saving deployment addresses..."
 
-# Save to .env.faucet
-cat <<EOF > .env.faucet
+
+cat <<EOF > .env.faucet.$CHAIN_ID
 # EdenVest Faucet Deployment (Chain ID: $CHAIN_ID)
 FAUCET_ADDRESS=$FAUCET
 CNGN_ADDRESS=$CNGN
@@ -132,7 +119,7 @@ USDC_ADDRESS=$USDC
 USDT_ADDRESS=$USDT
 EOF
 
-# Save to JSON
+
 cat <<EOF > deployments/faucet_$CHAIN_ID.json
 {
   "chainId": "$CHAIN_ID",
@@ -144,22 +131,30 @@ cat <<EOF > deployments/faucet_$CHAIN_ID.json
 }
 EOF
 
-echo "✅ Addresses saved to .env.faucet and deployments/faucet_$CHAIN_ID.json"
+echo "✅ Addresses saved to .env.faucet.$CHAIN_ID and deployments/faucet_$CHAIN_ID.json"
 
-# ───────────────────────────────────────────────
-# Wait before verification
-# ───────────────────────────────────────────────
+echo ""
+echo "=== VERIFICATION COMMANDS (for manual use) ==="
+echo "# Faucet"
+echo "forge verify-contract --chain $CHAIN_ID --verifier $VERIFIER --verifier-url $VERIFIER_URL $FAUCET src/misc/Faucet.sol:EdenVestFaucet"
+echo ""
+echo "# cNGN"
+echo "forge verify-contract --chain $CHAIN_ID --verifier $VERIFIER --verifier-url $VERIFIER_URL --constructor-args \"$CNGN_ARGS\" $CNGN src/misc/Faucet.sol:FaucetToken"
+echo ""
+echo "# USDC"
+echo "forge verify-contract --chain $CHAIN_ID --verifier $VERIFIER --verifier-url $VERIFIER_URL --constructor-args \"$USDC_ARGS\" $USDC src/misc/Faucet.sol:FaucetToken"
+echo ""
+echo "# USDT"
+echo "forge verify-contract --chain $CHAIN_ID --verifier $VERIFIER --verifier-url $VERIFIER_URL --constructor-args \"$USDT_ARGS\" $USDT src/misc/Faucet.sol:FaucetToken"
+
 echo ""
 echo "⏳ Waiting 60 seconds before verification to allow chain indexing..."
-sleep 60
+sleep 15
 
-# ───────────────────────────────────────────────
-# Verify Contracts
-# ───────────────────────────────────────────────
+
 echo ""
 echo "🔍 Starting contract verification..."
 
-# Function to verify contract with retries
 verify_contract() {
   local ADDRESS=$1
   local CONTRACT_PATH=$2
@@ -173,19 +168,27 @@ verify_contract() {
   while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
     if [ -z "$CONSTRUCTOR_ARGS" ]; then
       # No constructor args
+      echo $CHAIN_ID
+      echo $VERIFIER
+      echo $VERIFIER_URL
+      echo $ETHERSCAN_API_KEY
+      echo $ADDRESS
+      echo $CONTRACT_PATH
+
+
       forge verify-contract \
         --chain "$CHAIN_ID" \
-        --verifier "$VERIFIER" \
+        --verifier "blockscout" \
         --verifier-url "$VERIFIER_URL" \
         --etherscan-api-key "$ETHERSCAN_API_KEY" \
         "$ADDRESS" \
         "$CONTRACT_PATH" \
         --watch && break
     else
-      # With constructor args
+
       forge verify-contract \
         --chain "$CHAIN_ID" \
-        --verifier "$VERIFIER" \
+        --verifier "blockscout" \
         --verifier-url "$VERIFIER_URL" \
         --etherscan-api-key "$ETHERSCAN_API_KEY" \
         --constructor-args "$CONSTRUCTOR_ARGS" \
@@ -215,12 +218,12 @@ verify_contract() {
   fi
 }
 
-# Verify Faucet Contract
+
 echo ""
 echo "1️⃣ Verifying Faucet Contract..."
 verify_contract "$FAUCET" "src/misc/Faucet.sol:EdenVestFaucet" "" "Faucet"
 
-# Verify cNGN Token
+
 echo ""
 echo "2️⃣ Verifying cNGN Token..."
 CNGN_ARGS=$(cast abi-encode "constructor(string,string,uint8,uint256,address)" \
@@ -231,7 +234,6 @@ CNGN_ARGS=$(cast abi-encode "constructor(string,string,uint8,uint256,address)" \
   "$FAUCET")
 verify_contract "$CNGN" "src/misc/Faucet.sol:FaucetToken" "$CNGN_ARGS" "cNGN"
 
-# Verify USDC Token
 echo ""
 echo "3️⃣ Verifying USDC Token..."
 USDC_ARGS=$(cast abi-encode "constructor(string,string,uint8,uint256,address)" \
@@ -242,7 +244,7 @@ USDC_ARGS=$(cast abi-encode "constructor(string,string,uint8,uint256,address)" \
   "$FAUCET")
 verify_contract "$USDC" "src/misc/Faucet.sol:FaucetToken" "$USDC_ARGS" "USDC"
 
-# Verify USDT Token
+
 echo ""
 echo "4️⃣ Verifying USDT Token..."
 USDT_ARGS=$(cast abi-encode "constructor(string,string,uint8,uint256,address)" \
@@ -253,9 +255,7 @@ USDT_ARGS=$(cast abi-encode "constructor(string,string,uint8,uint256,address)" \
   "$FAUCET")
 verify_contract "$USDT" "src/misc/Faucet.sol:FaucetToken" "$USDT_ARGS" "USDT"
 
-# ───────────────────────────────────────────────
-# Final Summary
-# ───────────────────────────────────────────────
+
 echo ""
 echo "═══════════════════════════════════════════════"
 echo "🎉 FAUCET DEPLOYMENT AND VERIFICATION COMPLETE!"

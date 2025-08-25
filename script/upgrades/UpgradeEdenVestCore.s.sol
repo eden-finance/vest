@@ -10,8 +10,7 @@ import {EdenVestCore} from "../../src/vest/EdenVestCore.sol";
 ///   - PRIVATE_KEY     = <admin key with ADMIN_ROLE on the proxy>
 contract UpgradeEdenVestCoreScript is Script {
     // EIP-1967 implementation slot: bytes32(uint256(keccak256("eip1967.proxy.implementation")) - 1)
-    bytes32 internal constant _IMPLEMENTATION_SLOT =
-        0x360894A13BA1A3210667C828492DB98DCA3E2076CC3735A920A3CA505D382BBC;
+    bytes32 internal constant _IMPLEMENTATION_SLOT = 0x360894A13BA1A3210667C828492DB98DCA3E2076CC3735A920A3CA505D382BBC;
 
     function _getImpl(address proxy) internal view returns (address impl) {
         bytes32 data = vm.load(proxy, _IMPLEMENTATION_SLOT);
@@ -28,14 +27,12 @@ contract UpgradeEdenVestCoreScript is Script {
 
         vm.startBroadcast(pk);
 
-
         EdenVestCore newImpl = new EdenVestCore();
         console2.log("New implementation:  ", address(newImpl));
 
         // Optional post-upgrade call data (leave empty if not calling anything)
         bytes memory data = "";
 
-       
         EdenVestCore(proxy).upgradeToAndCall(address(newImpl), data);
 
         vm.stopBroadcast();
@@ -45,7 +42,6 @@ contract UpgradeEdenVestCoreScript is Script {
         require(afterImpl == address(newImpl), "Upgrade failed: impl mismatch");
     }
 }
-
 
 // DEPLOY COMMAND
 // forge verify-contract \

@@ -69,12 +69,10 @@ contract EdenVestTestBase is Test {
 
         // Deploy and initialize EdenVestCore
         EdenVestCore impl = new EdenVestCore();
-        bytes memory initData = abi.encodeCall(
-        EdenVestCore.initialize,
-        (address(cNGN), treasury, admin, 250));
+        bytes memory initData = abi.encodeCall(EdenVestCore.initialize, (address(cNGN), treasury, admin, 250));
 
-     ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
-    edenCore = EdenVestCore(address(proxy));
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
+        edenCore = EdenVestCore(address(proxy));
 
         taxCollector = new TaxCollector(treasury, admin, address(edenCore));
 

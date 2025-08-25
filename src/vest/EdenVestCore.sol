@@ -285,51 +285,45 @@ contract EdenVestCore is
         emit InvestmentMade(params.pool, msg.sender, tokenId, amountOut, lpTokens);
     }
 
-function withdrawAndSwap(WithdrawAndSwapParams calldata p)
-    external
-    whenNotPaused
-    nonReentrant
-    returns (uint256 amountOut)
-{
-    address _pool = p.pool;
-    if (!isRegisteredPool[_pool]) revert InvalidPool();
-    if (p.tokenOut == address(0)) revert InvalidToken();
-    if (p.deadline != 0 && p.deadline < block.timestamp) revert DeadlineExpired();
+    function withdrawAndSwap(WithdrawAndSwapParams calldata p)
+        external
+        whenNotPaused
+        nonReentrant
+        returns (uint256 amountOut)
+    {
+        address _pool = p.pool;
+        if (!isRegisteredPool[_pool]) revert InvalidPool();
+        if (p.tokenOut == address(0)) revert InvalidToken();
+        if (p.deadline != 0 && p.deadline < block.timestamp) revert DeadlineExpired();
 
-    address _lpToken = poolInfo[_pool].lpToken;
-    IERC20(_lpToken).safeTransferFrom(msg.sender, _pool, p.lpTokenAmount);
+        address _lpToken = poolInfo[_pool].lpToken;
+        IERC20(_lpToken).safeTransferFrom(msg.sender, _pool, p.lpTokenAmount);
 
-    uint256 amountInCNGN = IInvestmentPool(_pool).withdraw(msg.sender, p.tokenId, p.lpTokenAmount);
-    if (amountInCNGN == 0) revert InsufficientLiquidity();
+        uint256 amountInCNGN = IInvestmentPool(_pool).withdraw(msg.sender, p.tokenId, p.lpTokenAmount);
+        if (amountInCNGN == 0) revert InsufficientLiquidity();
 
-    if (p.tokenOut == cNGN) {
-        emit WithdrawnAndSwapped(_pool, msg.sender, p.tokenId, amountInCNGN, cNGN, amountInCNGN);
-        return amountInCNGN;
+        if (p.tokenOut == cNGN) {
+            emit WithdrawnAndSwapped(_pool, msg.sender, p.tokenId, amountInCNGN, cNGN, amountInCNGN);
+            return amountInCNGN;
+        }
+
+        if (p.minAmountOut == 0) revert MinAmountOutZero();
+        uint256 slippageBps = p.maxSlippageBps == 0 ? 100 : p.maxSlippageBps;
+        if (slippageBps > 300) revert InvalidSlippage();
+
+        IERC20 _cngn = IERC20(cNGN);
+        _cngn.safeTransferFrom(msg.sender, address(this), amountInCNGN);
+
+        _cngn.forceApprove(address(swapRouter), amountInCNGN);
+
+        amountOut = swapRouter.swapExactTokensForTokens(cNGN, p.tokenOut, amountInCNGN, p.minAmountOut, p.deadline);
+        if (amountOut == 0) revert SwapFailed();
+
+        _cngn.forceApprove(address(swapRouter), 0);
+        IERC20(p.tokenOut).safeTransfer(msg.sender, amountOut);
+
+        emit WithdrawnAndSwapped(_pool, msg.sender, p.tokenId, amountInCNGN, p.tokenOut, amountOut);
     }
-
-    if (p.minAmountOut == 0) revert MinAmountOutZero();
-    uint256 slippageBps = p.maxSlippageBps == 0 ? 100 : p.maxSlippageBps;
-    if (slippageBps > 300) revert InvalidSlippage(); 
-
-    IERC20 _cngn = IERC20(cNGN);
-    _cngn.safeTransferFrom(msg.sender, address(this), amountInCNGN);
-
-    _cngn.forceApprove(address(swapRouter), amountInCNGN);
-
-    amountOut = swapRouter.swapExactTokensForTokens(
-        cNGN,
-        p.tokenOut,
-        amountInCNGN,
-        p.minAmountOut,
-        p.deadline
-    );
-    if (amountOut == 0) revert SwapFailed();
-
-    _cngn.forceApprove(address(swapRouter), 0);
-    IERC20(p.tokenOut).safeTransfer(msg.sender, amountOut);
-
-    emit WithdrawnAndSwapped(_pool, msg.sender, p.tokenId, amountInCNGN, p.tokenOut, amountOut);
-}
 
     function withdraw(address pool, uint256 tokenId, uint256 lpTokenAmount)
         external

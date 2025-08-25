@@ -12,13 +12,13 @@ contract CreatePool is Script {
     function run() external {
         // env
         address edenCoreProxy = vm.envAddress("EDEN_CORE_PROXY");
-        address cNGN          = vm.envAddress("CNGN_ADDRESS");
-        address poolMultisig  = vm.envAddress("POOL_MULTISIG");
-        address nftManager    = vm.envAddress("NFT_POSITION_MANAGER");
-        uint256 pk            = vm.envUint("PRIVATE_KEY");
-        address deployer      = vm.addr(pk);
+        address cNGN = vm.envAddress("CNGN_ADDRESS");
+        address poolMultisig = vm.envAddress("POOL_MULTISIG");
+        address nftManager = vm.envAddress("NFT_POSITION_MANAGER");
+        uint256 pk = vm.envUint("PRIVATE_KEY");
+        address deployer = vm.addr(pk);
 
-address[] memory multisigSigners = new address[](3);
+        address[] memory multisigSigners = new address[](3);
         multisigSigners[0] = vm.envOr("MULTISIG_SIGNER_1", deployer);
         multisigSigners[1] = vm.envOr("MULTISIG_SIGNER_2", deployer);
         multisigSigners[2] = vm.envOr("MULTISIG_SIGNER_3", deployer);

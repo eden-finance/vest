@@ -58,11 +58,7 @@ contract DeployProxyScript is Script {
 
         // Prepare initialization data
         bytes memory initData = abi.encodeWithSelector(
-            EdenVestCore.initialize.selector,
-            config.cNGN,
-            config.treasury,
-            config.admin,
-            config.globalTaxRate
+            EdenVestCore.initialize.selector, config.cNGN, config.treasury, config.admin, config.globalTaxRate
         );
 
         // Deploy proxy

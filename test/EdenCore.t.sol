@@ -33,61 +33,45 @@ contract EdenCoreTest is EdenVestTestBase {
 
     // ============ Initialization Tests ============
 
-function test_Initialize_Success() public {
-    EdenVestCore impl = new EdenVestCore();
-    bytes memory initData = abi.encodeCall(
-        EdenVestCore.initialize,
-        (address(cNGN), treasury, admin, 250)
-    );
-    ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
-    EdenVestCore newCore = EdenVestCore(address(proxy));
+    function test_Initialize_Success() public {
+        EdenVestCore impl = new EdenVestCore();
+        bytes memory initData = abi.encodeCall(EdenVestCore.initialize, (address(cNGN), treasury, admin, 250));
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
+        EdenVestCore newCore = EdenVestCore(address(proxy));
 
-    assertEq(newCore.cNGN(), address(cNGN));
-    assertEq(newCore.protocolTreasury(), treasury);
-    assertEq(newCore.globalTaxRate(), 250);
-    assertTrue(newCore.hasRole(newCore.ADMIN_ROLE(), admin));
-    assertTrue(newCore.hasRole(newCore.POOL_CREATOR_ROLE(), admin));
-}
+        assertEq(newCore.cNGN(), address(cNGN));
+        assertEq(newCore.protocolTreasury(), treasury);
+        assertEq(newCore.globalTaxRate(), 250);
+        assertTrue(newCore.hasRole(newCore.ADMIN_ROLE(), admin));
+        assertTrue(newCore.hasRole(newCore.POOL_CREATOR_ROLE(), admin));
+    }
 
-function test_RevertWhen_InitializeWithHighTaxRate() public {
-    EdenVestCore impl = new EdenVestCore();
+    function test_RevertWhen_InitializeWithHighTaxRate() public {
+        EdenVestCore impl = new EdenVestCore();
 
+        bytes memory initData = abi.encodeCall(EdenVestCore.initialize, (address(cNGN), treasury, admin, 1001));
 
-    bytes memory initData = abi.encodeCall(
-        EdenVestCore.initialize,
-        (address(cNGN), treasury, admin, 1001)
-    );
+        vm.expectRevert(EdenVestCore.InvalidTaxRate.selector);
+        new ERC1967Proxy(address(impl), initData);
+    }
 
-    vm.expectRevert(EdenVestCore.InvalidTaxRate.selector);
-    new ERC1967Proxy(address(impl), initData);
-}
+    function test_RevertWhen_InitializeWithZeroAddress() public {
+        EdenVestCore impl = new EdenVestCore();
 
-function test_RevertWhen_InitializeWithZeroAddress() public {
-    EdenVestCore impl = new EdenVestCore();
-    
-    bytes memory badCngn = abi.encodeCall(
-        EdenVestCore.initialize,
-        (address(0), treasury, admin, 250)
-    );
-    vm.expectRevert(EdenVestCore.InvalidAddress.selector);
-    new ERC1967Proxy(address(impl), badCngn);
+        bytes memory badCngn = abi.encodeCall(EdenVestCore.initialize, (address(0), treasury, admin, 250));
+        vm.expectRevert(EdenVestCore.InvalidAddress.selector);
+        new ERC1967Proxy(address(impl), badCngn);
 
-    bytes memory badTreasury = abi.encodeCall(
-        EdenVestCore.initialize,
-        (address(cNGN), address(0), admin, 250)
-    );
-    vm.expectRevert(EdenVestCore.InvalidAddress.selector);
-    new ERC1967Proxy(address(impl), badTreasury);
-}
+        bytes memory badTreasury = abi.encodeCall(EdenVestCore.initialize, (address(cNGN), address(0), admin, 250));
+        vm.expectRevert(EdenVestCore.InvalidAddress.selector);
+        new ERC1967Proxy(address(impl), badTreasury);
+    }
 
     function test_AdminHasRole() public {
-          EdenVestCore impl = new EdenVestCore();
-    bytes memory initData = abi.encodeCall(
-        EdenVestCore.initialize,
-        (address(cNGN), treasury, admin, 250)
-    );
-    ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
-    EdenVestCore newCore = EdenVestCore(address(proxy));
+        EdenVestCore impl = new EdenVestCore();
+        bytes memory initData = abi.encodeCall(EdenVestCore.initialize, (address(cNGN), treasury, admin, 250));
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
+        EdenVestCore newCore = EdenVestCore(address(proxy));
 
         assertTrue(newCore.hasRole(newCore.EMERGENCY_ROLE(), admin), "Emergency role not granted");
         assertTrue(newCore.hasRole(newCore.POOL_CREATOR_ROLE(), admin), "Pool creator role not granted");
