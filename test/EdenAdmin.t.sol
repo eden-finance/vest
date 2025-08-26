@@ -465,7 +465,7 @@ contract EdenAdminTest is EdenVestTestBase {
         );
     }
 
-    function test_GetMultisigSigners() public view {
+    function test_GetMultisigSigners() public {
         address[] memory signers = edenAdmin.getMultisigSigners();
         assertEq(signers.length, 3, "Signer count mismatch");
         assertEq(signers[0], multisigSigners[0], "Signer 0 mismatch");
@@ -502,7 +502,7 @@ contract EdenAdminTest is EdenVestTestBase {
         assertEq(edenAdmin.getProposalSignatureCount(proposalId), 2, "Should have 2 signatures");
     }
 
-    function test_IsMultisigSigner() public view {
+    function test_IsMultisigSigner() public {
         assertTrue(edenAdmin.isMultisigSigner(multisigSigners[0]), "Should be signer");
         assertTrue(edenAdmin.isMultisigSigner(multisigSigners[1]), "Should be signer");
         assertTrue(edenAdmin.isMultisigSigner(multisigSigners[2]), "Should be signer");
@@ -576,15 +576,15 @@ contract EdenAdminTest is EdenVestTestBase {
 
     // ============ Constants and Configuration Tests ============
 
-    function test_RequiredSignaturesConstant() public view {
+    function test_RequiredSignaturesConstant() public  {
         assertEq(edenAdmin.REQUIRED_SIGNATURES(), 2, "Required signatures should be 2");
     }
 
-    function test_ProposalExpiryConstant() public view {
+    function test_ProposalExpiryConstant() public  {
         assertEq(edenAdmin.PROPOSAL_EXPIRY(), 2 days, "Proposal expiry should be 2 days");
     }
 
-    function test_MultisigSignerRole() public view {
+    function test_MultisigSignerRole() public  {
         bytes32 expectedRole = keccak256("MULTISIG_SIGNER_ROLE");
         assertEq(edenAdmin.MULTISIG_SIGNER_ROLE(), expectedRole, "Multisig signer role hash mismatch");
 

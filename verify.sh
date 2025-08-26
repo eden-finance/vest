@@ -134,3 +134,32 @@ forge verify-contract \
 
 echo "✅ Batch 3B verification complete."
 
+# ───────────────────────────────────────────────
+# Verify EdenCore Proxy (ERC1967Proxy)
+# ───────────────────────────────────────────────
+
+
+INIT_DATA=$(cast calldata \
+  "initialize(address,address,address,uint256)" \
+  "$CNGN_ADDRESS" "$TREASURY_ADDRESS" "$ADMIN_ADDRESS" 250)
+
+# 2) Encode constructor(address _logic, bytes _data)
+CONSTRUCTOR_PROXY=$(cast abi-encode "constructor(address,bytes)" "$EDEN_CORE_IMPL" "$INIT_DATA")
+
+# 3) Verify the proxy bytecode at your proxy address, using the OZ path
+
+forge verify-contract \
+  --rpc-url "$RPC_URL" \
+  --verifier "$VERIFIER" \
+  --verifier-url "$VERIFIER_URL" \
+  --constructor-args "$CONSTRUCTOR_PROXY" \
+  "$EDEN_CORE_PROXY" \
+  "lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol:ERC1967Proxy" \
+  || forge verify-contract \
+       --rpc-url "$RPC_URL" \
+       --verifier "$VERIFIER" \
+       --verifier-url "$VERIFIER_URL" \
+       --constructor-args "$CONSTRUCTOR_PROXY" \
+       "$EDEN_CORE_PROXY" \
+       "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol:ERC1967Proxy" \
+       || echo "⚠️ ERC1967Proxy already verified or failed"

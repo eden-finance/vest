@@ -284,7 +284,7 @@ contract EdenCoreTest is EdenVestTestBase {
 
     // ============ View Function Tests ============
 
-    function test_GetAllPools() public view {
+    function test_GetAllPools() public {
         address[] memory pools = edenCore.getAllPools();
         assertEq(pools.length, 1, "Pool count mismatch");
         assertEq(pools[0], pool, "Pool address mismatch");

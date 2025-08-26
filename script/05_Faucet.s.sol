@@ -183,7 +183,7 @@ contract DeployFaucetScript is Script {
         }
     }
 
-    function getAdditionalWhitelistAddresses() internal view returns (address[] memory) {
+    function getAdditionalWhitelistAddresses() internal returns (address[] memory) {
         // You can add more addresses here or read from environment
         string memory whitelist = vm.envOr("FAUCET_WHITELIST", string(""));
 
@@ -225,7 +225,7 @@ contract DeployFaucetScript is Script {
         console.log("  Native:", address(faucet).balance / 1e18);
     }
 
-    function printVerificationCommands() internal view {
+    function printVerificationCommands() internal {
         console.log("\n=== VERIFICATION COMMANDS ===");
         console.log("Save these commands to verify contracts on block explorer:\n");
 
@@ -266,7 +266,7 @@ contract DeployFaucetScript is Script {
 
     function generateTokenVerificationCommand(address token, string memory name, string memory symbol)
         internal
-        view
+        
         returns (string memory)
     {
         string memory rpcUrl = vm.envOr("RPC_URL", string("https://enugu-rpc.assetchain.org/"));

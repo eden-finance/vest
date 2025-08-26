@@ -86,7 +86,7 @@ contract DeployCoreScript is Script {
         return address(edenCoreImpl);
     }
 
-    function _getDeploymentConfig() internal view returns (DeploymentConfig memory) {
+    function _getDeploymentConfig() internal returns (DeploymentConfig memory) {
         address admin = vm.envAddress("ADMIN_ADDRESS");
 
         return DeploymentConfig({
@@ -101,7 +101,7 @@ contract DeployCoreScript is Script {
 
     function _saveAddresses(address nftRenderer, address taxCollector, address swapRouter, address edenCoreImpl)
         internal
-        pure
+        view
     {
         // Save to a simple format that can be read by next scripts
         console.log("\n=== SAVE THESE ADDRESSES FOR NEXT BATCH ===");

@@ -77,7 +77,7 @@ contract DeployProxyScript is Script {
         return address(edenAdmin);
     }
 
-    function _getDeploymentConfig() internal view returns (DeploymentConfig memory) {
+    function _getDeploymentConfig() internal returns (DeploymentConfig memory) {
         address admin = vm.envAddress("ADMIN_ADDRESS");
         address[] memory signers = new address[](3);
         signers[0] = admin;
@@ -93,7 +93,7 @@ contract DeployProxyScript is Script {
         });
     }
 
-    function _saveAddresses(address edenCoreProxy, address edenAdmin) internal pure {
+    function _saveAddresses(address edenCoreProxy, address edenAdmin) internal view {
         console.log("\n=== BATCH 2 COMPLETE ===");
         console.log(string.concat("export EDEN_CORE_PROXY=", vm.toString(edenCoreProxy)));
         console.log(string.concat("export EDEN_ADMIN=", vm.toString(edenAdmin)));
