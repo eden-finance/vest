@@ -1,14 +1,16 @@
 #!/bin/bash
 set -e
 
+
 # Load .env (main) and .env.core (deployment addresses)
 if [ -f .env ]; then
   source .env
 fi
 
 if [ -f .env.core ]; then
-  source .env.core
+  source .env.core.$CHAIN_ID
 fi
+
 
 # REQUIRED ENV VARS CHECK
 required_envs=(
@@ -24,12 +26,14 @@ for var in "${required_envs[@]}"; do
   fi
 done
 
+
 # Setup chain RPC and blockscout config
 ETHERSCAN_API_KEY=${ETHERSCAN_API_KEY:-"dummy"} # Needed by forge
 CHAIN_ID=${CHAIN_ID:-"42421"}
 RPC_URL=${RPC_URL:-"https://enugu-rpc.assetchain.org/"}
-VERIFIER="blockscout"
-VERIFIER_URL="https://scan-testnet.assetchain.org/api/"
+VERIFIER=${VERIFIER}
+VERIFIER_URL=${VERIFIER_URL}
+
 
 # ✅ EdenPoolNFT - No constructor args
 forge verify-contract \

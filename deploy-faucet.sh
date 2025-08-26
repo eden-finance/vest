@@ -135,7 +135,7 @@ verify_contract() {
         --verifier "$VERIFIER" \
         --verifier-url "$VERIFIER_URL" \
         "$ADDRESS" \
-        "$CONTRACT_PATH" && break
+        "$CONTRACT_PATH" --show-standard-json-input > deployments/stdjson.faucet.$ADDRESS.$CHAIN_ID.json && break
     else
       # With constructor args
       forge verify-contract \
@@ -144,7 +144,7 @@ verify_contract() {
         --verifier-url "$VERIFIER_URL" \
         --constructor-args "$CONSTRUCTOR_ARGS" \
         "$ADDRESS" \
-        "$CONTRACT_PATH" && break
+        "$CONTRACT_PATH"  --show-standard-json-input > deployments/stdjson.faucet.$ADDRESS.$CHAIN_ID.json&& break
     fi
     
     RETRY_COUNT=$((RETRY_COUNT + 1))

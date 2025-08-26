@@ -27,3 +27,5 @@ assetchain_mainnet = "https://rpc.assetchain.org"
 [etherscan]
 assetchain_testnet = { key = "${ETHERSCAN_API_KEY}", url = "https://scan-testnet.assetchain.org/api" }
 assetchain_mainnet = { key = "${ETHERSCAN_API_KEY}", url = "https://scan.assetchain.org/api" }
+base =         { key = "${ETHERSCAN_API_KEY}", url = "https://api.basescan.org/api" }
+base-sepolia = { key = "${ETHERSCAN_API_KEY}", url = "https://api-sepolia.basescan.org/api" }

@@ -30,12 +30,12 @@ forge script script/01_DeployCore.s.sol:DeployCoreScript \
   --rpc-url "$RPC_URL" \
   --legacy \
   --gas-limit 60000000 \
-  --private-key "$PRIVATE_KEY" | tee deployment.log
+  --private-key "$PRIVATE_KEY" | tee deployment.$CHAIN_ID.log
 
-NFT_RENDERER=$(grep "NFT_RENDERER=" deployment.log | cut -d '=' -f2 | xargs)
-TAX_COLLECTOR=$(grep "TAX_COLLECTOR=" deployment.log | cut -d '=' -f2 | xargs)
-SWAP_ROUTER=$(grep "SWAP_ROUTER=" deployment.log | cut -d '=' -f2 | xargs)
-EDEN_CORE_IMPL=$(grep "EDEN_CORE_IMPL=" deployment.log | cut -d '=' -f2 | xargs)
+NFT_RENDERER=$(grep "NFT_RENDERER=" deployment.$CHAIN_ID.log | cut -d '=' -f2 | xargs)
+TAX_COLLECTOR=$(grep "TAX_COLLECTOR=" deployment.$CHAIN_ID.log | cut -d '=' -f2 | xargs)
+SWAP_ROUTER=$(grep "SWAP_ROUTER=" deployment.$CHAIN_ID.log | cut -d '=' -f2 | xargs)
+EDEN_CORE_IMPL=$(grep "EDEN_CORE_IMPL=" deployment.$CHAIN_ID.log | cut -d '=' -f2 | xargs)
 
 echo "✅ Batch 1 complete."
 sleep 10
@@ -51,10 +51,10 @@ forge script script/02_DeployProxy.s.sol:DeployProxyScript \
   --rpc-url "$RPC_URL" \
     --legacy \
   --gas-limit 60000000 \
-  --private-key "$PRIVATE_KEY" | tee proxy.log
+  --private-key "$PRIVATE_KEY" | tee proxy.$CHAIN_ID.log
 
-EDEN_CORE_PROXY=$(grep "export EDEN_CORE_PROXY=" proxy.log | cut -d '=' -f2 | xargs)
-EDEN_ADMIN=$(grep "export EDEN_ADMIN=" proxy.log | cut -d '=' -f2 | xargs)
+EDEN_CORE_PROXY=$(grep "export EDEN_CORE_PROXY=" proxy.$CHAIN_ID.log | cut -d '=' -f2 | xargs)
+EDEN_ADMIN=$(grep "export EDEN_ADMIN=" proxy.$CHAIN_ID.log | cut -d '=' -f2 | xargs)
 
 echo "✅ Batch 2 complete."
 sleep 10
@@ -68,11 +68,11 @@ forge script script/03a_DeployPoolFactory.s.sol:DeployPoolFactory \
   --rpc-url "$RPC_URL" \
   --legacy \
   --gas-limit 60000000 \
-  --private-key "$PRIVATE_KEY" | tee factory.log
+  --private-key "$PRIVATE_KEY" | tee factory.$CHAIN_ID.log
 
-POOL_FACTORY=$(grep "export POOL_FACTORY=" factory.log | cut -d '=' -f2 | xargs)
-POOL_IMPLEMENTATION=$(grep "export POOL_IMPLEMENTATION=" factory.log | cut -d '=' -f2 | xargs)
-LP_TOKEN_IMPLEMENTATION=$(grep "export LP_TOKEN_IMPLEMENTATION=" factory.log | cut -d '=' -f2 | xargs)
+POOL_FACTORY=$(grep "export POOL_FACTORY=" factory.$CHAIN_ID.log | cut -d '=' -f2 | xargs)
+POOL_IMPLEMENTATION=$(grep "export POOL_IMPLEMENTATION=" factory.$CHAIN_ID.log | cut -d '=' -f2 | xargs)
+LP_TOKEN_IMPLEMENTATION=$(grep "export LP_TOKEN_IMPLEMENTATION=" factory.$CHAIN_ID.log | cut -d '=' -f2 | xargs)
 
 # ───────────────────────────────────────────────
 # Batch 3B: NFTPositionManager
@@ -83,9 +83,9 @@ forge script script/03b_DeployNFTPositionManager.s.sol:DeployNFTPositionManager 
   --rpc-url "$RPC_URL" \
     --legacy \
   --gas-limit 60000000 \
-  --private-key "$PRIVATE_KEY" | tee nftpm.log
+  --private-key "$PRIVATE_KEY" | tee nftpm.$CHAIN_ID.log
 
-NFT_POSITION_MANAGER=$(grep "export NFT_POSITION_MANAGER=" nftpm.log | cut -d '=' -f2 | xargs)
+NFT_POSITION_MANAGER=$(grep "export NFT_POSITION_MANAGER=" nftpm.$CHAIN_ID.log | cut -d '=' -f2 | xargs)
 
 echo "✅ Batch 3 complete."
 sleep 10
