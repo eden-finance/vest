@@ -73,7 +73,6 @@ contract InvestmentPool is
     event TokensSwept(address indexed token, uint256 amount, address indexed to, address indexed operator);
     event NativeSwept(uint256 amount, address indexed to, address indexed operator);
 
-
     function initialize(InitParams memory params) public initializer {
         __AccessControl_init();
         __ReentrancyGuard_init();
