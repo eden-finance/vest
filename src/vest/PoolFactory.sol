@@ -82,7 +82,7 @@ contract PoolFactory is IPoolFactory, Ownable {
             taxRate: params.taxRate
         });
 
-        InvestmentPool(pool).initialize(initParams);
+        InvestmentPool(payable(pool)).initialize(initParams);
         isPool[pool] = true;
         allPools.push(pool);
 

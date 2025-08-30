@@ -39,8 +39,8 @@ contract CreatePool is Script {
             cNGN: cNGN,
             poolMultisig: poolMultisig,
             multisigSigners: multisigSigners,
-            lockDuration: 30 days,
-            minInvestment: 10_000e6,
+            lockDuration: 10 minutes,
+            minInvestment: 1_000e6,
             maxInvestment: 1_000_000e6,
             utilizationCap: 1_000_000_000e6,
             expectedRate: 2000, // 10% in bps

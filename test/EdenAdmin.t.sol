@@ -576,15 +576,15 @@ contract EdenAdminTest is EdenVestTestBase {
 
     // ============ Constants and Configuration Tests ============
 
-    function test_RequiredSignaturesConstant() public  {
+    function test_RequiredSignaturesConstant() public {
         assertEq(edenAdmin.REQUIRED_SIGNATURES(), 2, "Required signatures should be 2");
     }
 
-    function test_ProposalExpiryConstant() public  {
+    function test_ProposalExpiryConstant() public {
         assertEq(edenAdmin.PROPOSAL_EXPIRY(), 2 days, "Proposal expiry should be 2 days");
     }
 
-    function test_MultisigSignerRole() public  {
+    function test_MultisigSignerRole() public {
         bytes32 expectedRole = keccak256("MULTISIG_SIGNER_ROLE");
         assertEq(edenAdmin.MULTISIG_SIGNER_ROLE(), expectedRole, "Multisig signer role hash mismatch");
 

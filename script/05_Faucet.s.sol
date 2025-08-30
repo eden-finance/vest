@@ -266,7 +266,6 @@ contract DeployFaucetScript is Script {
 
     function generateTokenVerificationCommand(address token, string memory name, string memory symbol)
         internal
-        
         returns (string memory)
     {
         string memory rpcUrl = vm.envOr("RPC_URL", string("https://enugu-rpc.assetchain.org/"));
