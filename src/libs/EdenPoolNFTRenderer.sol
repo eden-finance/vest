@@ -579,7 +579,7 @@ library EdenPoolNFTRenderer {
      * @return Formatted amount string
      */
     function _formatAmount(uint256 amount) internal pure returns (string memory) {
-        uint256 wholePart = amount / 1e18;
+        uint256 wholePart = amount / 1e6;
         return wholePart.toString();
     }
 

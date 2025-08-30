@@ -4,8 +4,8 @@ out = "out"
 libs = ["lib"]
 gas_limit = 15000000 
 gas_price = 8000000000
-solc_version = "0.8.30"
-evm_version = "cancun"
+solc_version = "0.8.22"
+evm_version = "paris"
 remappings = [
     "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
     "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
@@ -22,7 +22,7 @@ ffi = true
 
 [rpc_endpoints]
 assetchain_testnet = "https://enugu-rpc.assetchain.org"
-assetchain_mainnet = "https://rpc.assetchain.org"
+assetchain_mainnet = "https://mainnet-rpc.assetchain.org"
 
 [etherscan]
 assetchain_testnet = { key = "${ETHERSCAN_API_KEY}", url = "https://scan-testnet.assetchain.org/api" }

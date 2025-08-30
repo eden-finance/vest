@@ -33,17 +33,17 @@ contract CreatePool is Script {
         console.log("NFT Manager     :", nftManager);
 
         IPoolFactory.PoolParams memory poolParams = IPoolFactory.PoolParams({
-            name: "Chowdeck group of companies 2",
-            symbol: "CWD",
+            name: "Nigerian Money Market",
+            symbol: "NMM",
             admin: deployer,
             cNGN: cNGN,
             poolMultisig: poolMultisig,
             multisigSigners: multisigSigners,
-            lockDuration: 40 minutes,
-            minInvestment: 10_000e18,
-            maxInvestment: 100_000e18,
-            utilizationCap: 1_000_000e18,
-            expectedRate: 5000, // 10% in bps
+            lockDuration: 30 days,
+            minInvestment: 10_000e6,
+            maxInvestment: 1_000_000e6,
+            utilizationCap: 1_000_000_000e6,
+            expectedRate: 2000, // 10% in bps
             taxRate: 0
         });
 
