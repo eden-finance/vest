@@ -33,8 +33,8 @@ contract CreatePool is Script {
         console.log("NFT Manager     :", nftManager);
 
         IPoolFactory.PoolParams memory poolParams = IPoolFactory.PoolParams({
-            name: "Nigerian Money Market",
-            symbol: "NMM",
+            name: "Nigerian Money Market Test",
+            symbol: "NMMt",
             admin: deployer,
             cNGN: cNGN,
             poolMultisig: poolMultisig,
@@ -43,8 +43,8 @@ contract CreatePool is Script {
             minInvestment: 1_000e6,
             maxInvestment: 1_000_000e6,
             utilizationCap: 1_000_000_000e6,
-            expectedRate: 2000, // 10% in bps
-            taxRate: 0
+            expectedRate: 2000, // 20% in bps
+            taxRate: 100
         });
 
         EdenVestCore core = EdenVestCore(edenCoreProxy);

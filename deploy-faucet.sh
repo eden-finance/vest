@@ -172,7 +172,7 @@ echo "2️⃣ Verifying cNGN Token..."
 CNGN_ARGS=$(cast abi-encode "constructor(string,string,uint8,uint256,address)" \
   "Celo Nigerian Naira" \
   "cNGN" \
-  18 \
+  6 \
   1000000000 \
   "$FAUCET")
 verify_contract "$CNGN" "src/misc/Faucet.sol:EdenVestFaucet" "$CNGN_ARGS" "cNGN"

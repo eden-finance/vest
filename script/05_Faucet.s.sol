@@ -51,7 +51,7 @@ contract DeployFaucetScript is Script {
             TokenConfig({
                 name: "Compliant Nigerian Naira",
                 symbol: "cNGN",
-                decimals: 18,
+                decimals: 6,
                 initialSupply: 1_000_000_000, // 1 billion
                 faucetAmount: 10_000 * 1e18, // 10,000 tokens
                 cooldown: 2 hours,

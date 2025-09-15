@@ -114,7 +114,7 @@ contract EdenVestFaucet is Ownable, ReentrancyGuard, Pausable {
     constructor() Ownable(msg.sender) {
         // Default native token configuration
         nativeConfig = TokenConfig({
-            amount: 0.1 ether, // 0.1 native token
+            amount: 0.01 ether, // 0.1 native token
             cooldown: 1 hours, // 1 hour cooldown
             dailyLimit: 2, // 2 claims per day
             enabled: true,

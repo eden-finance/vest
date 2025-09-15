@@ -53,7 +53,6 @@ contract InvestmentPool is
     uint8 public cngnDecimals;
     uint8 public lpDecimals;
     uint256 public scaleFactor;
-    uint256 public totalDepositedScaled;
 
     mapping(uint256 => Investment) public investments;
     mapping(address => uint256[]) public userInvestments;
@@ -72,6 +71,7 @@ contract InvestmentPool is
 
     event TokensSwept(address indexed token, uint256 amount, address indexed to, address indexed operator);
     event NativeSwept(uint256 amount, address indexed to, address indexed operator);
+    event Redeemed(address indexed user, uint256 lpAmount, uint256 redeemAmount);
 
     function initialize(InitParams memory params) public initializer {
         __AccessControl_init();
@@ -151,18 +151,25 @@ contract InvestmentPool is
             require(totalDeposited + amount <= poolConfig.utilizationCap, "Exceeds cap");
         }
 
+        // Transfer to this contract
+        IERC20(cNGN).safeTransferFrom(edenCore, address(this), amount);
+
         uint256 investmentId = nextInvestmentId++;
         uint256 maturityTime = block.timestamp + poolConfig.lockDuration;
-        uint256 expectedInterest = _calculateExpectedReturn(amount);
+        uint256 interest = _calculateExpectedReturn(amount);
+        uint256 grossReturn = amount + interest;
 
-        uint256 totalLPTokens;
+        // Calculate LP tokens
         uint256 ts = IERC20(lpToken).totalSupply();
+        uint256 prevAssets = totalAssets() - amount;
+        uint256 prevAssetsScaled = prevAssets * scaleFactor;
         uint256 amountScaled = amount * scaleFactor;
+        uint256 totalLPTokens;
 
-        if (ts == 0 || totalDepositedScaled == 0) {
+        if (ts == 0 || prevAssetsScaled == 0) {
             totalLPTokens = amountScaled;
         } else {
-            totalLPTokens = (amountScaled * ts) / totalDepositedScaled;
+            totalLPTokens = (amountScaled * ts) / prevAssetsScaled;
         }
 
         uint256 poolTaxRate = IInvestmentPool(address(this)).taxRate();
@@ -170,11 +177,12 @@ contract InvestmentPool is
 
         uint256 effectiveTaxRate = poolTaxRate > 0 ? poolTaxRate : edenCore_.globalTaxRate();
 
+        uint256 userShareBps = BASIS_POINTS - effectiveTaxRate;
+        uint256 expectedReturn = (grossReturn * userShareBps) / BASIS_POINTS;
+
         taxAmount = (totalLPTokens * effectiveTaxRate) / BASIS_POINTS;
         userLPTokens = totalLPTokens - taxAmount;
         address taxCollector = edenCore_.taxCollector();
-
-        uint256 expectedReturn = expectedInterest + amount;
 
         investments[investmentId] = Investment({
             investor: investor,
@@ -190,7 +198,6 @@ contract InvestmentPool is
 
         userInvestments[investor].push(investmentId);
         totalDeposited += amount;
-        totalDepositedScaled += amountScaled;
 
         ILPToken(lpToken).mint(investor, userLPTokens);
         ILPToken(lpToken).mint(taxCollector, taxAmount);
@@ -207,9 +214,6 @@ contract InvestmentPool is
         );
 
         nftToInvestment[tokenId] = investmentId;
-
-        // Transfer funds to multisig
-        IERC20(cNGN).safeTransferFrom(edenCore, poolMultisig, amount);
 
         emit InvestmentCreated(
             investmentId, investor, amount, userLPTokens, tokenId, expectedReturn, maturityTime, title
@@ -233,33 +237,55 @@ contract InvestmentPool is
         uint256 investmentId = nftToInvestment[tokenId];
         Investment storage investment = investments[investmentId];
 
-        require(investment.investor == investor, "Not owner");
+        require(IERC721(nftManager).ownerOf(tokenId) == investor, "Not owner");
         require(!investment.isWithdrawn, "Already withdrawn");
         require(block.timestamp >= investment.maturityTime, "Not matured");
-        require(IERC721(nftManager).ownerOf(tokenId) == investor, "NFT not owned");
 
         uint256 requiredLPTokens = investment.lpTokens;
-        require(lpAmount >= investment.lpTokens, "Insufficient LP tokens");
+        require(lpAmount >= requiredLPTokens, "Insufficient LP tokens");
+        require(IERC20(lpToken).balanceOf(address(this)) >= requiredLPTokens, "LP tokens not received");
+
+        uint256 ts = IERC20(lpToken).totalSupply();
+        uint256 _totalAssets = totalAssets();
+        withdrawAmount = (requiredLPTokens * _totalAssets) / ts;
+
+        require(IERC20(cNGN).balanceOf(address(this)) >= withdrawAmount, "Insufficient liquidity");
 
         investment.isWithdrawn = true;
+        investment.actualReturn = withdrawAmount;
 
-        uint256 expectedInterest = _calculateExpectedReturn(investment.amount);
-
-        withdrawAmount += investment.amount + expectedInterest;
-        totalDepositedScaled -= investment.amount * scaleFactor;
         totalDeposited -= investment.amount;
-
-        require(IERC20(lpToken).balanceOf(address(this)) >= requiredLPTokens, "LP tokens not received");
+        totalWithdrawn += withdrawAmount;
 
         ILPToken(lpToken).burn(address(this), requiredLPTokens);
 
         INFTPositionManager(nftManager).burnPosition(tokenId);
 
-        require(IERC20(cNGN).balanceOf(address(this)) >= withdrawAmount, "Insufficient pool balance");
-
-        IERC20(cNGN).safeTransfer(investment.investor, withdrawAmount);
+        IERC20(cNGN).safeTransfer(investor, withdrawAmount);
 
         emit InvestmentWithdrawn(investmentId, investor, withdrawAmount);
+    }
+
+    /**
+     * @notice Redeem LP tokens for underlying assets
+     * @param lpAmount Amount of LP tokens to redeem
+     */
+    function redeem(uint256 lpAmount) external nonReentrant {
+        require(lpAmount > 0, "Zero amount");
+
+        IERC20(lpToken).safeTransferFrom(msg.sender, address(this), lpAmount);
+
+        uint256 ts = IERC20(lpToken).totalSupply();
+        uint256 _totalAssets = totalAssets();
+        uint256 redeemAmount = (lpAmount * _totalAssets) / ts;
+
+        require(IERC20(cNGN).balanceOf(address(this)) >= redeemAmount, "Insufficient liquidity");
+
+        ILPToken(lpToken).burn(address(this), lpAmount);
+
+        IERC20(cNGN).safeTransfer(msg.sender, redeemAmount);
+
+        emit Redeemed(msg.sender, lpAmount, redeemAmount);
     }
 
     // ============ ADMIN FUNCTIONS ============
@@ -375,6 +401,13 @@ contract InvestmentPool is
         return !investment.isWithdrawn && block.timestamp >= investment.maturityTime;
     }
 
+    /**
+     * @notice Get total assets
+     */
+    function totalAssets() public view returns (uint256) {
+        return IERC20(cNGN).balanceOf(address(this));
+    }
+
     // ============ INTERNAL FUNCTIONS ============
 
     /**
@@ -386,33 +419,15 @@ contract InvestmentPool is
     }
 
     /**
-     * @dev Calculate LP tokens to mint
-     */
-    function _calculateLPTokens(uint256 amount) internal view returns (uint256) {
-        uint256 ts = IERC20(lpToken).totalSupply(); // 18 dp
-        uint256 amountScaled = amount * scaleFactor; // 18 dp
-
-        if (ts == 0 || totalDepositedScaled == 0) {
-            return amountScaled;
-        }
-        return (amountScaled * ts) / totalDepositedScaled;
-    }
-
-    /**
      * @notice Sweep arbitrary ERC20 tokens from the pool to a recipient
      * @dev For safety:
      *      - Never sweep LP token
-     *      - Sweeping cNGN only allowed while PAUSED
+     *      - Sweeping cNGN no longer requires pause
      */
     function sweepERC20(address token, address to, uint256 amount) external onlyRole(MULTISIG_ROLE) nonReentrant {
         require(to != address(0), "Invalid to");
         require(amount > 0, "Zero amount");
         require(token != lpToken, "Cannot sweep LP token");
-
-        // Protect user funds: only allow cNGN sweep if pool is paused
-        if (token == cNGN) {
-            require(paused(), "Pause required to sweep cNGN");
-        }
 
         IERC20(token).safeTransfer(to, amount);
         emit TokensSwept(token, amount, to, msg.sender);
@@ -420,12 +435,11 @@ contract InvestmentPool is
 
     /**
      * @notice Sweep native RWA from the pool to a recipient
-     * @dev Only allowed while PAUSED to avoid impacting live operations
+     * @dev No longer requires pause
      */
     function sweepNative(address payable to, uint256 amount) external onlyRole(MULTISIG_ROLE) nonReentrant {
         require(to != address(0), "Invalid to");
         require(amount > 0, "Zero amount");
-        require(paused(), "Pause required to sweep ETH");
 
         (bool ok,) = to.call{value: amount}("");
         require(ok, "ETH transfer failed");
