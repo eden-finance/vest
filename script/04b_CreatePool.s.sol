@@ -33,7 +33,7 @@ contract CreatePool is Script {
         console.log("NFT Manager     :", nftManager);
 
         IPoolFactory.PoolParams memory poolParams = IPoolFactory.PoolParams({
-            name: "Nigerian Money Market Test",
+            name: "Nigerian Money Market",
             symbol: "NMMt",
             admin: deployer,
             cNGN: cNGN,

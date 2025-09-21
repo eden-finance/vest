@@ -292,6 +292,8 @@ forge test -vvvv
 # Generate coverage report
 forge test -vvvv --gas-limit 60000000 --match-path test/Univ3Router_Integration.t.sol
 
+forge test -vvvv --gas-limit 60000000 --match-contract EdenCoreTest --match-test test_CollectTax_Success
+
 ```
 
 ### Test Categories

@@ -37,9 +37,12 @@ interface IInvestmentPool {
         uint256 depositTime;
         uint256 maturityTime;
         uint256 expectedReturn;
-        uint256 actualReturn;
         bool isWithdrawn;
-        uint256 lpTokens;
+        uint256 userLpRequired;
+        bool taxWithdrawn;
+        uint256 taxLpRequired;
+        uint256 actualReturn;
+        uint256 totalLpForPosition;
     }
 
     event InvestmentCreated(
@@ -72,4 +75,7 @@ interface IInvestmentPool {
     function pause() external;
     function unpause() external;
     function updatePoolConfig(PoolConfig memory config) external;
+    function getPoolConfig() external view returns (PoolConfig memory);
+    function nftToInvestment(uint256 tokenId) external view returns (uint256);
+    function getInvestment(uint256 investmentId) external view returns (Investment memory);
 }
