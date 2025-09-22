@@ -469,12 +469,11 @@ contract EdenCoreTest is EdenVestTestBase {
         uint256 effectiveTaxBps = cfg.taxRate > 0 ? cfg.taxRate : edenCore.globalTaxRate();
         uint256 taxLp = (amount * scaleFactor * effectiveTaxBps) / 10_000;
 
-
         vm.warp(inv.maturityTime);
 
         uint256 lockSeconds = inv.maturityTime - inv.depositTime;
         uint256 interest = (amount * cfg.expectedRate * lockSeconds) / (10_000 * 365 days);
-       uint256 taxShare = (interest * taxLp) / inv.totalLpForPosition;
+        uint256 taxShare = (interest * taxLp) / inv.totalLpForPosition;
 
         require(taxShare > 0, "sanity: taxShare must be > 0");
 
