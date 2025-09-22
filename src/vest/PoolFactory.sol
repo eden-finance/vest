@@ -4,6 +4,7 @@ pragma solidity ^0.8.22;
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "./interfaces/IPoolFactory.sol";
 import "./interfaces/IInvestmentPool.sol";
 import "./interfaces/ILPToken.sol";
@@ -60,11 +61,6 @@ contract PoolFactory is IPoolFactory, Ownable {
         // Initialize LP token
         string memory lpTokenName = string.concat("Eden ", params.name, " LP");
         string memory lpTokenSymbol = string.concat("e", params.symbol, "LP");
-
-        pool = poolImplementation.clone();
-
-        ILPToken(lpToken).initialize(lpTokenName, lpTokenSymbol, params.admin, pool);
-
         IInvestmentPool.InitParams memory initParams = IInvestmentPool.InitParams({
             name: params.name,
             lpToken: lpToken,
@@ -82,7 +78,13 @@ contract PoolFactory is IPoolFactory, Ownable {
             taxRate: params.taxRate
         });
 
-        InvestmentPool(payable(pool)).initialize(initParams);
+        bytes memory initCalldata = abi.encodeCall(InvestmentPool.initialize, (initParams));
+
+        ERC1967Proxy proxy = new ERC1967Proxy(poolImplementation, initCalldata);
+        pool = address(proxy);
+
+        ILPToken(lpToken).initialize(lpTokenName, lpTokenSymbol, params.admin, pool);
+
         isPool[pool] = true;
         allPools.push(pool);
 

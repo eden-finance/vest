@@ -36,12 +36,13 @@ interface IInvestmentPool {
         string title;
         uint256 depositTime;
         uint256 maturityTime;
-        uint256 expectedReturn;
+        uint256 estimatedReturn;
         bool isWithdrawn;
         uint256 userLpRequired;
         bool taxWithdrawn;
         uint256 taxLpRequired;
         uint256 actualReturn;
+        uint256 actualInterest;
         uint256 totalLpForPosition;
     }
 
@@ -51,7 +52,7 @@ interface IInvestmentPool {
         uint256 amount,
         uint256 lpTokens,
         uint256 indexed tokenId,
-        uint256 expectedReturn,
+        uint256 estimatedReturn,
         uint256 maturityTime,
         string title
     );

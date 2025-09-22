@@ -1,4 +1,3 @@
-// test/EdenCore.t.sol
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
@@ -470,16 +469,13 @@ contract EdenCoreTest is EdenVestTestBase {
         uint256 effectiveTaxBps = cfg.taxRate > 0 ? cfg.taxRate : edenCore.globalTaxRate();
         uint256 taxLp = (amount * scaleFactor * effectiveTaxBps) / 10_000;
 
-        vm.prank(address(taxCollector));
-        IERC20(lpToken).transfer(admin, taxLp);
 
         vm.warp(inv.maturityTime);
 
         uint256 lockSeconds = inv.maturityTime - inv.depositTime;
         uint256 interest = (amount * cfg.expectedRate * lockSeconds) / (10_000 * 365 days);
-        uint256 gross = amount + interest;
+       uint256 taxShare = (interest * taxLp) / inv.totalLpForPosition;
 
-        uint256 taxShare = (gross * taxLp) / inv.totalLpForPosition;
         require(taxShare > 0, "sanity: taxShare must be > 0");
 
         vm.prank(multisig);
@@ -517,10 +513,9 @@ contract EdenCoreTest is EdenVestTestBase {
 
         uint256 lockSeconds = inv.maturityTime - inv.depositTime;
         uint256 interest = (amount * cfg.expectedRate * lockSeconds) / (10_000 * 365 days);
-        uint256 gross = amount + interest;
 
         vm.prank(multisig);
-        cNGN.transfer(pool, gross);
+        cNGN.transfer(pool, interest);
 
         uint256 adminBalBefore = cNGN.balanceOf(admin);
 
@@ -529,13 +524,15 @@ contract EdenCoreTest is EdenVestTestBase {
         uint256 paid = InvestmentPool(payable(pool)).collectTax(investmentId);
 
         uint256 adminBalAfter = cNGN.balanceOf(admin);
-        uint256 taxShare = (gross * taxLp) / inv.totalLpForPosition;
+        uint256 taxShare = (interest * taxLp) / inv.totalLpForPosition;
 
         assertEq(paid, taxShare, "Return value mismatch");
         assertEq(adminBalAfter - adminBalBefore, taxShare, "Admin cNGN not received");
         assertEq(IERC20(lpToken).balanceOf(admin), 0, "Admin tax LP not burned");
 
-        (,,,,,, bool isWithdrawn,, bool taxWithdrawn,,,) = InvestmentPool(payable(pool)).investments(investmentId);
+        inv = IInvestmentPool(pool).getInvestment(investmentId);
+        bool isWithdrawn = inv.isWithdrawn;
+        bool taxWithdrawn = inv.taxWithdrawn;
         assertFalse(isWithdrawn, "User leg should not be withdrawn");
         assertTrue(taxWithdrawn, "Tax not marked withdrawn");
     }

@@ -36,7 +36,7 @@ contract EdenSwapRouter_Integration is Test {
     function setUp() public {
         // Fork AssetChain
         string memory rpc = vm.envString("RPC_URL");
-        vm.createSelectFork(rpc);
+        vm.createSelectFork(rpc, 2364352); // Fork at a specific block to avoid state issues
 
         router = ISwapRouter(EDEN_SWAP_ROUTER);
         quoter = IQuoterV2(QUOTER_V2);
