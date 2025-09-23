@@ -520,11 +520,7 @@ contract InvestmentPool is
         emit NativeSwept(amount, to, msg.sender);
     }
 
-    function _authorizeUpgrade(address newImplementation)
-        internal
-        override
-        onlyRole(POOL_ADMIN_ROLE) // or DEFAULT_ADMIN_ROLE if you prefer
-    {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(POOL_ADMIN_ROLE) {}
 
-    uint256[50] private __gap;
+    // uint256[50] private __gap;
 }

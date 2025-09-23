@@ -34,7 +34,7 @@ contract CreatePool is Script {
 
         IPoolFactory.PoolParams memory poolParams = IPoolFactory.PoolParams({
             name: "Nigerian Money Market",
-            symbol: "NMMt",
+            symbol: "NMM",
             admin: deployer,
             cNGN: cNGN,
             poolMultisig: poolMultisig,
