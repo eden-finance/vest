@@ -79,7 +79,6 @@ contract InvestmentPool is
         __AccessControl_init();
         __ReentrancyGuard_init();
         __Pausable_init();
-        __UUPSUpgradeable_init();
 
         require(params.lpToken != address(0), "Invalid LP token");
         require(params.cNGN != address(0), "Invalid cNGN");

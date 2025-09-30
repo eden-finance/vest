@@ -10,7 +10,6 @@ import "../src/vest/NFTPositionManager.sol";
 
 contract CreatePool is Script {
     function run() external {
-        // env
         address edenCoreProxy = vm.envAddress("EDEN_CORE_PROXY");
         address cNGN = vm.envAddress("CNGN_ADDRESS");
         address poolMultisig = vm.envAddress("POOL_MULTISIG");
@@ -50,7 +49,7 @@ contract CreatePool is Script {
         EdenVestCore core = EdenVestCore(edenCoreProxy);
         address pool = core.createPool(poolParams);
 
-        // Authorize pool in NFTPositionManager (caller must have DEFAULT_ADMIN_ROLE there)
+        // Skip NFT authorization for now to test pool creation
         NFTPositionManager(nftManager).authorizePool(pool, true);
 
         vm.stopBroadcast();

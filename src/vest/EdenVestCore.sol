@@ -364,11 +364,11 @@ contract EdenVestCore is
         return activePools;
     }
 
-    function checkSwapLiquidity(address tokenIn, uint256 amountIn)
+    function checkSwapLiquidity(address tokenIn, address tokenOut, uint256 amountIn)
         external
         returns (uint256 expectedOut, bool hasLiquidity)
     {
-        expectedOut = swapRouter.getAmountOut(tokenIn, cNGN, amountIn);
+        expectedOut = swapRouter.getAmountOut(tokenIn, tokenOut, amountIn);
         hasLiquidity = expectedOut > 0;
     }
 

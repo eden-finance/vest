@@ -7,7 +7,7 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import "@bokkypoobah/BokkyPooBahsDateTimeLibrary/contracts/BokkyPooBahsDateTimeLibrary.sol";
 
 /**
- * @title Nigerian Money Market NFT Renderer with Advanced Animations
+ * @title Eden Vest NFT Renderer with Advanced Animations
  * @dev Generates unique animated SVG-based NFTs for investment positions
  */
 library EdenPoolNFTRenderer {
@@ -49,7 +49,7 @@ library EdenPoolNFTRenderer {
         string memory description = _generateDescription(params);
 
         string memory json = string.concat(
-            '{"name":"Nigerian Money Market Position #',
+            '{"name":"Eden Vest Position',
             params.tokenId.toString(),
             '","description":"',
             description,
@@ -323,7 +323,7 @@ library EdenPoolNFTRenderer {
      */
     function _renderHeader() internal pure returns (string memory) {
         return string.concat(
-            '<text x="175" y="50" class="title">Nigerian Money Market</text>',
+            '<text x="175" y="50" class="title">Eden Vest Pool</text>',
             '<text x="175" y="75" class="small">Investment Position</text>',
             // Animated divider line
             '<line x1="40" y1="110" x2="310" y2="110" stroke="',

@@ -47,8 +47,8 @@ contract EdenSwapRouter is IEdenSwapRouter.ISwapRouter, Ownable, ReentrancyGuard
 
     // ============ CONSTANTS ============
     uint256 public constant BASIS_POINTS = 10000;
-    uint256 public constant QUOTE_GAS_LIMIT = 300000; // 300k gas limit for quotes
-    uint256 public constant MAX_SLIPPAGE_BASIS_POINTS = 300; // 3% maximum slippage
+    uint256 public constant QUOTE_GAS_LIMIT = 6000000; 
+    uint256 public constant MAX_SLIPPAGE_BASIS_POINTS = 300;
     uint256 public constant MAX_FAILED_SWAPS = 5;
     uint256 public constant FAILURE_RESET_TIME = 1 hours;
 
@@ -57,9 +57,9 @@ contract EdenSwapRouter is IEdenSwapRouter.ISwapRouter, Ownable, ReentrancyGuard
     IUniswapV3QuoterV2 public immutable quoter;
 
     // ============ STATE VARIABLES ============
-    uint24 public defaultPoolFee = 3000; // 0.3%
-    uint256 public maxSlippageBasisPoints = 300; // 3% max slippage
-    uint256 public quoteRateLimit = 1; // 1 second between quotes per address
+    uint24 public defaultPoolFee = 3000; 
+    uint256 public maxSlippageBasisPoints = 300;
+    uint256 public quoteRateLimit = 1; 
 
     // ============ MAPPINGS ============
     mapping(address => mapping(address => uint24)) public poolFees;
