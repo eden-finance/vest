@@ -350,7 +350,7 @@ library EdenPoolNFTRenderer {
             '<rect x="35" y="195" width="120" height="50" rx="8" fill="',
             BRAND_PURPLE,
             '" opacity="0.1" class="floating-element"/>',
-            '<text x="50" y="210" class="label">Expected Return:</text>',
+            '<text x="50" y="210" class="label">Estimated Return:</text>',
             '<text x="50" y="230" class="value">',
             _formatAmount(params.expectedReturn),
             " cNGN</text>",

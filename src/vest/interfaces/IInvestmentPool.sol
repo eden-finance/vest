@@ -62,6 +62,7 @@ interface IInvestmentPool {
     event InvestmentMatured(uint256 indexed investmentId, uint256 actualReturn);
     event PoolConfigUpdated(PoolConfig config);
     event PoolMultisigUpdated(address newMultisig);
+    event EmergencyWithdrawn(uint256 indexed investmentId, address indexed investor, uint256 principalPaid);
 
     function invest(address investor, uint256 amount, string memory title)
         external
@@ -79,4 +80,7 @@ interface IInvestmentPool {
     function getPoolConfig() external view returns (PoolConfig memory);
     function nftToInvestment(uint256 tokenId) external view returns (uint256);
     function getInvestment(uint256 investmentId) external view returns (Investment memory);
+    function emergencyWithdraw(address investor, uint256 tokenId, uint256 lpAmount)
+        external
+        returns (uint256 principalPaid);
 }

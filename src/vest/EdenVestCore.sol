@@ -338,6 +338,20 @@ contract EdenVestCore is
         withdrawAmount = IInvestmentPool(pool).withdraw(msg.sender, tokenId, lpTokenAmount);
     }
 
+    function emergencyWithdraw(address pool, uint256 tokenId, uint256 lpTokenAmount)
+        external
+        nonReentrant
+        returns (uint256 amount)
+    {
+        if (!isRegisteredPool[pool]) revert InvalidPool();
+
+        address lpToken = poolInfo[pool].lpToken;
+
+        IERC20(lpToken).transferFrom(msg.sender, pool, lpTokenAmount);
+
+        amount = IInvestmentPool(pool).emergencyWithdraw(msg.sender, tokenId, lpTokenAmount);
+    }
+
     // ============ VIEW FUNCTIONS ============
 
     function getAllPools() external view returns (address[] memory) {

@@ -36,15 +36,13 @@ contract EdenSwapRouter_Integration is Test {
     function setUp() public {
         // Fork AssetChain
         string memory rpc = vm.envString("RPC_URL");
-        vm.createSelectFork(rpc, 2364352); // Fork at a specific block to avoid state issues
+        vm.createSelectFork(rpc, 604364);
 
         router = ISwapRouter(EDEN_SWAP_ROUTER);
         quoter = IQuoterV2(QUOTER_V2);
 
-        // Choose a funded test user (could also just use vm.addr(...) but here we transfer to a known address)
         user = address(0x1234567890123456789012345678901234567890);
 
-        // Fund user from whale
         vm.startPrank(CNGN_WHALE);
         IERC20(CNGN).transfer(user, 1_000e18);
         vm.stopPrank();
@@ -53,7 +51,6 @@ contract EdenSwapRouter_Integration is Test {
     function test_swapExactTokensForTokens_real() public {
         uint256 amountIn = 100e18;
 
-        // 1️⃣ Get real quote from Quoter
         (uint256 quotedOut,,,) = quoter.quoteExactInputSingle(
             IQuoterV2.QuoteExactInputSingleParams({
                 tokenIn: CNGN,

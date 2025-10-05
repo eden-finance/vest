@@ -56,44 +56,64 @@ contract InvestmentPool is
     uint8 public lpDecimals;
     uint256 public scaleFactor;
 
+    // ============ CUSTOM ERRORS ============
+    error OnlyEdenCore();
+    error DepositsPaused();
+    error BelowMin();
+    error AboveMax();
+    error ExceedsCap();
+    error InvalidOwner();
+    error AlreadyWithdrawn();
+    error NotMatured();
+    error LPNotReceived();
+    error InsufficientLiquidity();
+    error ZeroAddress();
+    error ZeroAmount();
+    error BadTo();
+    error DurationTooShort();
+    error DurationTooLong();
+    error MaxLessThanMin();
+    error RateTooHigh();
+    error TaxRateTooHigh();
+    error InvalidName();
+    error CannotSweepLPToken();
+
+    // ============ STORAGE ============
     mapping(uint256 => Investment) public investments;
     mapping(address => uint256[]) public userInvestments;
     mapping(uint256 => uint256) public nftToInvestment;
 
-    // ============ MODIFIERS ============
-    modifier onlyEdenCore() {
-        require(msg.sender == edenCore, "Only Eden Core");
-        _;
-    }
-
-    modifier validInvestment(uint256 investmentId) {
-        require(investmentId < nextInvestmentId, "Invalid investment");
-        _;
-    }
-
+    // ============ EVENTS ============
     event TokensSwept(address indexed token, uint256 amount, address indexed to, address indexed operator);
     event NativeSwept(uint256 amount, address indexed to, address indexed operator);
     event Redeemed(address indexed user, uint256 lpAmount, uint256 redeemAmount);
 
+    // ============ MODIFIERS ============
+    modifier onlyEdenCore() {
+        if (msg.sender != edenCore) revert OnlyEdenCore();
+        _;
+    }
+
+    // ============ INITIALIZER ============
     function initialize(InitParams memory params) public initializer {
         __AccessControl_init();
         __ReentrancyGuard_init();
         __Pausable_init();
 
-        require(params.lpToken != address(0), "Invalid LP token");
-        require(params.cNGN != address(0), "Invalid cNGN");
-        require(params.poolMultisig != address(0), "Invalid multisig");
-        require(params.nftManager != address(0), "Invalid NFT manager");
-        require(params.edenCore != address(0), "Invalid Eden Core");
-        require(params.admin != address(0), "Invalid admin");
+        if (params.lpToken == address(0)) revert ZeroAddress();
+        if (params.cNGN == address(0)) revert ZeroAddress();
+        if (params.poolMultisig == address(0)) revert ZeroAddress();
+        if (params.nftManager == address(0)) revert ZeroAddress();
+        if (params.edenCore == address(0)) revert ZeroAddress();
+        if (params.admin == address(0)) revert ZeroAddress();
 
-        require(params.lockDuration >= MIN_LOCK_DURATION, "Lock duration too short");
-        require(params.lockDuration <= MAX_LOCK_DURATION, "Lock duration too long");
-        require(params.minInvestment > 0, "Invalid min investment");
-        require(params.maxInvestment >= params.minInvestment, "Invalid max investment");
-        require(params.expectedRate <= 10000, "Expected rate too high");
-        require(params.taxRate <= 1000, "Tax rate too high");
-        require(bytes(params.name).length > 0, "Invalid name");
+        if (params.lockDuration < MIN_LOCK_DURATION) revert DurationTooShort();
+        if (params.lockDuration > MAX_LOCK_DURATION) revert DurationTooLong();
+        if (params.minInvestment == 0) revert ZeroAmount();
+        if (params.maxInvestment < params.minInvestment) revert MaxLessThanMin();
+        if (params.expectedRate > 10000) revert RateTooHigh();
+        if (params.taxRate > 1000) revert TaxRateTooHigh();
+        if (bytes(params.name).length == 0) revert InvalidName();
 
         lpToken = params.lpToken;
         cNGN = params.cNGN;
@@ -114,12 +134,7 @@ contract InvestmentPool is
 
         lpDecimals = IERC20Metadata(lpToken).decimals();
         cngnDecimals = IERC20Metadata(cNGN).decimals();
-
-        if (lpDecimals >= cngnDecimals) {
-            scaleFactor = 10 ** (lpDecimals - cngnDecimals);
-        } else {
-            scaleFactor = 1;
-        }
+        scaleFactor = lpDecimals >= cngnDecimals ? 10 ** (lpDecimals - cngnDecimals) : 1;
 
         _grantRole(DEFAULT_ADMIN_ROLE, params.admin);
         _grantRole(POOL_ADMIN_ROLE, params.admin);
@@ -128,16 +143,11 @@ contract InvestmentPool is
             _grantRole(MULTISIG_ROLE, params.multisigSigners[i]);
         }
     }
+
+    // ============ CORE ============
     /**
      * @notice Process investment
-     * @param investor Investor address
-     * @param amount Investment amount
-     * @param title Investment title
-     * @return tokenId NFT token ID
-     * @return userLPTokens LP tokens minted
-     * @return taxAmount tokens minted for tax
      */
-
     function invest(address investor, uint256 amount, string memory title)
         external
         override
@@ -146,13 +156,10 @@ contract InvestmentPool is
         whenNotPaused
         returns (uint256 tokenId, uint256 userLPTokens, uint256 taxAmount)
     {
-        require(poolConfig.acceptingDeposits, "Deposits paused");
-        require(amount >= poolConfig.minInvestment, "Below minimum");
-        require(amount <= poolConfig.maxInvestment, "Exceeds maximum");
-
-        if (poolConfig.utilizationCap > 0) {
-            require(totalDeposited + amount <= poolConfig.utilizationCap, "Exceeds cap");
-        }
+        if (!poolConfig.acceptingDeposits) revert DepositsPaused();
+        if (amount < poolConfig.minInvestment) revert BelowMin();
+        if (amount > poolConfig.maxInvestment) revert AboveMax();
+        if (poolConfig.utilizationCap > 0 && totalDeposited + amount > poolConfig.utilizationCap) revert ExceedsCap();
 
         IERC20(cNGN).safeTransferFrom(edenCore, poolMultisig, amount);
 
@@ -186,6 +193,7 @@ contract InvestmentPool is
             actualInterest: 0,
             totalLpForPosition: userLp + taxLp
         });
+
         userLPTokens = userLp;
         taxAmount = taxLp;
 
@@ -211,11 +219,56 @@ contract InvestmentPool is
         emit InvestmentCreated(investmentId, investor, amount, userLPTokens, tokenId, grossReturn, maturityTime, title);
     }
 
+    /**
+     * @notice Emergency withdraw principal before maturity (no interest)
+     *         Burns user LP and tax LP (if any), returns principal to investor.
+     */
+    function emergencyWithdraw(address investor, uint256 tokenId, uint256 lpAmount)
+        external
+        onlyEdenCore
+        nonReentrant
+        returns (uint256 principalPaid)
+    {
+        uint256 investmentId = nftToInvestment[tokenId];
+        Investment storage inv = investments[investmentId];
+
+        if (IERC721(nftManager).ownerOf(tokenId) != investor) revert InvalidOwner();
+        if (inv.isWithdrawn) revert AlreadyWithdrawn();
+
+        if (lpAmount != inv.userLpRequired) revert LPNotReceived(); // reuse error for brevity
+        if (IERC20(lpToken).balanceOf(address(this)) < lpAmount) revert LPNotReceived();
+
+        principalPaid = inv.amount;
+        if (IERC20(cNGN).balanceOf(address(this)) < principalPaid) revert InsufficientLiquidity();
+
+        ILPToken(lpToken).burn(address(this), lpAmount);
+
+        if (!inv.taxWithdrawn && inv.taxLpRequired > 0) {
+            address taxHolder = IEdenCore(edenCore).taxCollector();
+            ILPToken(lpToken).burn(taxHolder, inv.taxLpRequired);
+            inv.taxWithdrawn = true;
+        }
+
+        inv.isWithdrawn = true;
+
+        totalDeposited -= inv.amount;
+        totalWithdrawn += principalPaid;
+
+        INFTPositionManager(nftManager).burnPosition(tokenId);
+
+        IERC20(cNGN).safeTransfer(investor, principalPaid);
+
+        emit EmergencyWithdrawn(investmentId, investor, principalPaid);
+    }
+
+    /**
+     * @notice Report actual interest for a batch of investments
+     */
     function reportActualInterestBatch(uint256[] calldata ids, uint256[] calldata interests)
         external
         onlyRole(POOL_ADMIN_ROLE)
     {
-        require(ids.length == interests.length, "len mismatch");
+        if (ids.length != interests.length) revert BadTo(); // reuse small error
         for (uint256 i = 0; i < ids.length; i++) {
             uint256 id = ids[i];
             Investment storage inv = investments[id];
@@ -242,15 +295,15 @@ contract InvestmentPool is
         returns (uint256 taxPaid)
     {
         Investment storage inv = investments[investmentId];
-        require(block.timestamp >= inv.maturityTime, "Not matured");
-        require(!inv.taxWithdrawn, "Tax already withdrawn");
+        if (block.timestamp < inv.maturityTime) revert NotMatured();
+        if (inv.taxWithdrawn) revert AlreadyWithdrawn();
 
         uint256 taxLp = inv.taxLpRequired;
-        require(taxLp > 0, "No tax LP");
+        if (taxLp == 0) revert ZeroAmount();
 
         uint256 interest = _interestFor(inv);
         uint256 taxShare = (interest * inv.taxLpRequired) / inv.totalLpForPosition;
-        require(IERC20(cNGN).balanceOf(address(this)) >= taxShare, "Insufficient liquidity");
+        if (IERC20(cNGN).balanceOf(address(this)) < taxShare) revert InsufficientLiquidity();
 
         ILPToken(lpToken).burn(IEdenCore(edenCore).taxCollector(), taxLp);
 
@@ -269,7 +322,7 @@ contract InvestmentPool is
         onlyRole(POOL_ADMIN_ROLE)
         returns (uint256 totalPaid, uint256 processed)
     {
-        require(to != address(0), "bad to");
+        if (to == address(0)) revert BadTo();
 
         address taxLpHolder = IEdenCore(edenCore).taxCollector();
 
@@ -307,38 +360,6 @@ contract InvestmentPool is
         }
     }
 
-    function pendingTaxClaims(uint256 offset, uint256 limit)
-        external
-        view
-        returns (uint256[] memory ids, uint256[] memory taxLp, uint256[] memory taxShare)
-    {
-        uint256 n = nextInvestmentId;
-        uint256 end = offset + limit;
-        if (end > n) end = n;
-
-        uint256 count;
-        for (uint256 i = offset; i < end; i++) {
-            Investment memory inv = investments[i];
-            if (!inv.taxWithdrawn && block.timestamp >= inv.maturityTime && inv.taxLpRequired > 0) count++;
-        }
-
-        ids = new uint256[](count);
-        taxLp = new uint256[](count);
-        taxShare = new uint256[](count);
-
-        uint256 k;
-        for (uint256 i = offset; i < end; i++) {
-            Investment memory inv = investments[i];
-            if (!inv.taxWithdrawn && block.timestamp >= inv.maturityTime && inv.taxLpRequired > 0) {
-                ids[k] = i;
-                taxLp[k] = inv.taxLpRequired;
-                uint256 interest = _interestFor(investments[i]);
-                taxShare[k] = (interest * inv.taxLpRequired) / inv.totalLpForPosition;
-                k++;
-            }
-        }
-    }
-
     function withdraw(address investor, uint256 tokenId, uint256 lpAmount)
         external
         override
@@ -349,18 +370,18 @@ contract InvestmentPool is
         uint256 investmentId = nftToInvestment[tokenId];
         Investment storage inv = investments[investmentId];
 
-        require(IERC721(nftManager).ownerOf(tokenId) == investor, "Not owner");
-        require(!inv.isWithdrawn, "Already withdrawn");
-        require(block.timestamp >= inv.maturityTime, "Not matured");
+        if (IERC721(nftManager).ownerOf(tokenId) != investor) revert InvalidOwner();
+        if (inv.isWithdrawn) revert AlreadyWithdrawn();
+        if (block.timestamp < inv.maturityTime) revert NotMatured();
 
-        require(lpAmount == inv.userLpRequired, "LP must equal position LP");
-        require(IERC20(lpToken).balanceOf(address(this)) >= lpAmount, "LP not received");
+        if (lpAmount != inv.userLpRequired) revert LPNotReceived(); // reuse error
+        if (IERC20(lpToken).balanceOf(address(this)) < lpAmount) revert LPNotReceived();
 
         uint256 interest = _interestFor(inv);
         uint256 userInterest = (interest * inv.userLpRequired) / inv.totalLpForPosition;
         uint256 userShare = inv.amount + userInterest;
 
-        require(IERC20(cNGN).balanceOf(address(this)) >= userShare, "Insufficient liquidity");
+        if (IERC20(cNGN).balanceOf(address(this)) < userShare) revert InsufficientLiquidity();
 
         ILPToken(lpToken).burn(address(this), lpAmount);
 
@@ -377,85 +398,53 @@ contract InvestmentPool is
         return userShare;
     }
 
-    // ============ ADMIN FUNCTIONS ============
-    /**
-     * @notice Update pool configuration
-     * @param config New configuration
-     */
+    // ============ ADMIN ============
     function updatePoolConfig(PoolConfig memory config) external onlyRole(POOL_ADMIN_ROLE) {
-        require(config.lockDuration >= MIN_LOCK_DURATION, "Duration too short");
-        require(config.lockDuration <= MAX_LOCK_DURATION, "Duration too long");
-        require(config.minInvestment > 0, "Invalid min investment");
-        require(config.maxInvestment >= config.minInvestment, "Invalid max investment");
-        require(config.expectedRate <= 10000, "Rate too high"); // Max 100% APY
+        if (config.lockDuration < MIN_LOCK_DURATION) revert DurationTooShort();
+        if (config.lockDuration > MAX_LOCK_DURATION) revert DurationTooLong();
+        if (config.minInvestment == 0) revert ZeroAmount();
+        if (config.maxInvestment < config.minInvestment) revert MaxLessThanMin();
+        if (config.expectedRate > 10000) revert RateTooHigh();
 
         poolConfig = config;
         emit PoolConfigUpdated(config);
     }
 
-    /**
-     * @notice Update pool multisig
-     * @param newMultisig New multisig address
-     */
     function updatePoolMultisig(address newMultisig) external onlyRole(POOL_ADMIN_ROLE) {
-        require(newMultisig != address(0), "Invalid address");
+        if (newMultisig == address(0)) revert ZeroAddress();
         poolMultisig = newMultisig;
         emit PoolMultisigUpdated(newMultisig);
     }
 
-    /**
-     * @notice Toggle accepting deposits
-     * @param accepting Whether to accept deposits
-     */
     function setAcceptingDeposits(bool accepting) external onlyRole(POOL_ADMIN_ROLE) {
         bool oldState = poolConfig.acceptingDeposits;
         poolConfig.acceptingDeposits = accepting;
-
         if (oldState != accepting) {
             emit DepositsToggled(accepting, msg.sender);
         }
     }
 
-    /**
-     * @notice Pause pool
-     */
     function pause() external onlyRole(POOL_ADMIN_ROLE) {
         _pause();
     }
 
-    /**
-     * @notice Unpause pool
-     */
     function unpause() external onlyRole(POOL_ADMIN_ROLE) {
         _unpause();
     }
 
-    // ============ VIEW FUNCTIONS ============
-
-    /**
-     * @notice Get pool configuration
-     */
+    // ============ VIEW ============
     function getPoolConfig() external view returns (PoolConfig memory) {
         return poolConfig;
     }
 
-    /**
-     * @notice Get investment details
-     */
     function getInvestment(uint256 investmentId) external view returns (Investment memory) {
         return investments[investmentId];
     }
 
-    /**
-     * @notice Get user investments
-     */
     function getUserInvestments(address user) external view returns (uint256[] memory) {
         return userInvestments[user];
     }
 
-    /**
-     * @notice Get pool statistics
-     */
     function getPoolStats()
         external
         view
@@ -480,46 +469,35 @@ contract InvestmentPool is
     function isWithdrawable(uint256 tokenId) external view returns (bool) {
         uint256 investmentId = nftToInvestment[tokenId];
         Investment memory investment = investments[investmentId];
-
         return !investment.isWithdrawn && block.timestamp >= investment.maturityTime;
     }
 
-    // ============ INTERNAL FUNCTIONS ============
-
-    /**
-     * @dev Calculate expected return
-     */
+    // ============ INTERNAL ============
     function _calculateExpectedReturn(uint256 amount) internal view returns (uint256) {
         uint256 timeInSeconds = poolConfig.lockDuration;
         return (amount * poolConfig.expectedRate * timeInSeconds) / (BASIS_POINTS * 365 days);
     }
 
-    /**
-     * @notice Sweep arbitrary ERC20 tokens from the pool to a recipient
-     * @dev For safety
-     */
     function sweepERC20(address token, address to, uint256 amount) external onlyRole(POOL_ADMIN_ROLE) nonReentrant {
-        require(to != address(0), "Invalid to");
-        require(amount > 0, "Zero amount");
-        require(token != lpToken, "Cannot sweep LP token");
+        if (to == address(0)) revert ZeroAddress();
+        if (amount == 0) revert ZeroAmount();
+        if (token == lpToken) revert CannotSweepLPToken();
 
         IERC20(token).safeTransfer(to, amount);
         emit TokensSwept(token, amount, to, msg.sender);
     }
 
-    /**
-     * @notice Sweep native RWA from the pool to a recipient
-     */
     function sweepNative(address payable to, uint256 amount) external onlyRole(POOL_ADMIN_ROLE) nonReentrant {
-        require(to != address(0), "Invalid to");
-        require(amount > 0, "Zero amount");
+        if (to == address(0)) revert ZeroAddress();
+        if (amount == 0) revert ZeroAmount();
 
         (bool ok,) = to.call{value: amount}("");
         require(ok, "ETH transfer failed");
         emit NativeSwept(amount, to, msg.sender);
     }
 
+    // ============ UUPS ============
     function _authorizeUpgrade(address newImplementation) internal override onlyRole(POOL_ADMIN_ROLE) {}
 
-    // uint256[50] private __gap;
+    uint256[50] private __gap;
 }

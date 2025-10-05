@@ -32,17 +32,17 @@ contract CreatePool is Script {
         console.log("NFT Manager     :", nftManager);
 
         IPoolFactory.PoolParams memory poolParams = IPoolFactory.PoolParams({
-            name: "Nigerian Money Market",
-            symbol: "NMM",
+            name: "Nigeria Money Market Fund",
+            symbol: "NMMF",
             admin: deployer,
             cNGN: cNGN,
             poolMultisig: poolMultisig,
             multisigSigners: multisigSigners,
-            lockDuration: 10 minutes,
+            lockDuration: 31 days,
             minInvestment: 1_000e6,
-            maxInvestment: 1_000_000e6,
+            maxInvestment: 10_000_000e6,
             utilizationCap: 1_000_000_000e6,
-            expectedRate: 2000, // 20% in bps
+            expectedRate: 1800, // 13% in bps
             taxRate: 100
         });
 

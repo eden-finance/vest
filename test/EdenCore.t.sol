@@ -12,6 +12,8 @@ contract EdenCoreTest is EdenVestTestBase {
     address public lpToken;
     EdenAdmin public edenAdmin;
 
+    uint256 public constant BASIS_POINTS = 10_000;
+
     function setUp() public override {
         super.setUp();
 
@@ -540,10 +542,13 @@ contract EdenCoreTest is EdenVestTestBase {
         return principal + ((principal * aprBps * lockSeconds) / (10_000 * 365 days));
     }
 
+    function _interest(uint256 principal, uint256 aprBps, uint256 lockSeconds) internal pure returns (uint256) {
+        return (principal * aprBps * lockSeconds) / (10_000 * 365 days);
+    }
+
     // ============ collectTaxBatch Tests ============
 
     function test_CollectTaxBatch_AllProcessed() public {
-        // 1) Create three investments (same lock, tax from global 250 bps)
         uint256 a1 = 5_000e18;
         uint256 a2 = 8_000e18;
         uint256 a3 = 12_000e18;
@@ -565,38 +570,105 @@ contract EdenCoreTest is EdenVestTestBase {
         IInvestmentPool.Investment memory i2 = IInvestmentPool(pool).getInvestment(id2);
         IInvestmentPool.Investment memory i3 = IInvestmentPool(pool).getInvestment(id3);
 
-        // 2) Warp to maturity
-        uint256 maturity = i3.maturityTime; // they should be similar; use the last
+        uint256 maturity = i3.maturityTime;
         vm.warp(maturity);
 
-        // 3) Compute gross & tax shares
         uint256 lock1 = i1.maturityTime - i1.depositTime;
         uint256 lock2 = i2.maturityTime - i2.depositTime;
         uint256 lock3 = i3.maturityTime - i3.depositTime;
 
-        // totalLpForPosition == amount (scaleFactor=1) and taxLp = amount * 250/10000
         uint256 taxLp1 = i1.taxLpRequired;
         uint256 taxLp2 = i2.taxLpRequired;
         uint256 taxLp3 = i3.taxLpRequired;
 
-        uint256 g1 = _gross(i1.amount, cfg.expectedRate, lock1);
-        uint256 g2 = _gross(i2.amount, cfg.expectedRate, lock2);
-        uint256 g3 = _gross(i3.amount, cfg.expectedRate, lock3);
+        uint256 interest1 = _interest(i1.amount, cfg.expectedRate, lock1);
+        uint256 interest2 = _interest(i2.amount, cfg.expectedRate, lock2);
+        uint256 interest3 = _interest(i3.amount, cfg.expectedRate, lock3);
 
-        uint256 s1 = (g1 * taxLp1) / i1.totalLpForPosition;
-        uint256 s2 = (g2 * taxLp2) / i2.totalLpForPosition;
-        uint256 s3 = (g3 * taxLp3) / i3.totalLpForPosition;
+        uint256 s1 = (interest1 * taxLp1) / i1.totalLpForPosition;
+        uint256 s2 = (interest2 * taxLp2) / i2.totalLpForPosition;
+        uint256 s3 = (interest3 * taxLp3) / i3.totalLpForPosition;
 
-        // 4) Fund pool fully
         vm.prank(multisig);
         cNGN.transfer(pool, s1 + s2 + s3);
 
-        // 5) Batch collect to admin
         (, address poolAdmin,,,) = edenCore.poolInfo(pool);
         uint256 balBefore = cNGN.balanceOf(admin);
 
+        uint256[] memory ids = new uint256[](3);
+        ids[0] = id1;
+        ids[1] = id2;
+        ids[2] = id3;
+
         vm.prank(poolAdmin);
-        (uint256 totalPaid, uint256 processed) = InvestmentPool(payable(pool)).collectTaxBatch(new uint256[](0), admin);
-        // NOTE: above empty array is wrong; pass ids below:
+        (uint256 totalPaid, uint256 processed) = InvestmentPool(payable(pool)).collectTaxBatch(ids, admin);
+        uint256 balAfter = cNGN.balanceOf(admin);
+
+        assertEq(totalPaid, s1 + s2 + s3, "Total paid mismatch");
+        assertEq(processed, 3, "Processed count mismatch");
+        assertEq(balAfter - balBefore, totalPaid, "Admin cNGN not received");
+    }
+
+    function test_EmergencyWithdraw_Success() public {
+        uint256 amount = 10_000e18;
+
+        // Invest
+        vm.startPrank(user1);
+        cNGN.approve(address(edenCore), amount);
+        (uint256 tokenId, uint256 lpAmount) = edenCore.invest(pool, amount, "Emergency Test", 0);
+        vm.stopPrank();
+
+        // Calculate tax LP for assertions
+        IInvestmentPool.PoolConfig memory cfg = IInvestmentPool(pool).getPoolConfig();
+        uint256 effectiveTaxBps = cfg.taxRate > 0 ? cfg.taxRate : edenCore.globalTaxRate();
+        uint8 lpDec = IERC20Metadata(lpToken).decimals();
+        uint8 cngnDec = MockcNGN(cNGN).decimals();
+        uint256 scaleFactor = (lpDec >= cngnDec) ? 10 ** (lpDec - cngnDec) : 1;
+        uint256 taxLp = (amount * scaleFactor * effectiveTaxBps) / BASIS_POINTS;
+        uint256 userLp = (amount * scaleFactor) - taxLp;
+
+        // Transfer LP to pool (simulating EdenCore wrapper behavior)
+        vm.prank(user1);
+        IERC20(lpToken).transfer(pool, userLp);
+
+        // Fund pool with principal for liquidity
+        vm.prank(multisig);
+        cNGN.transfer(pool, amount);
+
+        // Warp to before maturity (e.g., 1 day into a 30-day lock)
+        uint256 investmentId = IInvestmentPool(pool).nftToInvestment(tokenId);
+        IInvestmentPool.Investment memory inv = IInvestmentPool(pool).getInvestment(investmentId);
+        vm.warp(inv.depositTime + 1 days);
+
+        // Track balances
+        uint256 userCngnBefore = cNGN.balanceOf(user1);
+        uint256 taxLpBefore = IERC20(lpToken).balanceOf(address(taxCollector));
+
+        // Perform emergency withdraw (simulating call from EdenCore)
+        vm.prank(address(edenCore));
+        uint256 principalPaid = InvestmentPool(pool).emergencyWithdraw(user1, tokenId, userLp);
+
+        // Assertions
+        assertEq(principalPaid, amount, "Principal paid mismatch");
+
+        uint256 userCngnAfter = cNGN.balanceOf(user1);
+        assertEq(userCngnAfter - userCngnBefore, amount, "User cNGN not received");
+
+        uint256 taxLpAfter = IERC20(lpToken).balanceOf(address(taxCollector));
+        assertEq(taxLpBefore - taxLpAfter, taxLp, "Tax LP not burned");
+
+        // Check investment state
+        IInvestmentPool.Investment memory invAfter = IInvestmentPool(pool).getInvestment(investmentId);
+        assertTrue(invAfter.isWithdrawn, "Investment not marked withdrawn");
+        assertTrue(invAfter.taxWithdrawn, "Tax not marked withdrawn");
+
+        // Check totals
+        (uint256 deposited, uint256 withdrawn,,) = InvestmentPool(pool).getPoolStats();
+        assertEq(deposited, 0, "Deposited not reset");
+        assertEq(withdrawn, amount, "Withdrawn not updated");
+
+        // Check NFT burned
+        vm.expectRevert();
+        IERC721(nftManager).ownerOf(tokenId);
     }
 }
